@@ -50,17 +50,17 @@ function isBetter(program1, program2) {
 
 export class Database {
   constructor(savePath) {
-    this.feature_bins = 10;
-    this.num_islands = 3;
-    this.migration_interval = 10;
-    this.migration_rate = 0.1;
+    this.featureBins = 10;
+    this.numIslands = 3;
+    this.migrationInterval = 10;
+    this.migrationRate = 0.1;
     this.savePath = savePath;
 
     this.programs = {};
     this.featureMap = {};
-    this.islands = Array.from({ length: this.num_islands }, () => new Set());
+    this.islands = Array.from({ length: this.numIslands }, () => new Set());
     this.currentIsland = 0;
-    this.islandGenerations = Array.from({ length: this.num_islands }, () => 0);
+    this.islandGenerations = Array.from({ length: this.numIslands }, () => 0);
     this.lastMigrationGeneration = 0;
     this.bestProgramId = "";
     this.lastIteration = 0;
@@ -76,10 +76,10 @@ export class Database {
     await fs.mkdir(this.savePath, { recursive: true });
 
     const data = {
-      feature_bins: this.feature_bins,
-      num_islands: this.num_islands,
-      migration_interval: this.migration_interval,
-      migration_rate: this.migration_rate,
+      featureBins: this.featureBins,
+      numIslands: this.numIslands,
+      migrationInterval: this.migrationInterval,
+      migrationRate: this.migrationRate,
       programs: Object.fromEntries(
         Object.entries(this.programs).map(([id, p]) => [id, { ...p }])
       ),
@@ -110,10 +110,10 @@ export class Database {
     }
     const data = JSON.parse(raw);
 
-    this.feature_bins = data.feature_bins;
-    this.num_islands = data.num_islands;
-    this.migration_interval = data.migration_interval;
-    this.migration_rate = data.migration_rate;
+    this.featureBins = data.featureBins;
+    this.numIslands = data.numIslands;
+    this.migrationInterval = data.migrationInterval;
+    this.migrationRate = data.migrationRate;
     this.programs = Object.fromEntries(
       Object.entries(data.programs).map(([id, p]) => [id, new Program(p)])
     );
@@ -131,7 +131,7 @@ export class Database {
   async addProgram(program) {
     this.programs[program.id] = program;
 
-    const coords = getFeatureCoords(program, this.feature_bins);
+    const coords = getFeatureCoords(program, this.featureBins);
     const key = featureCoordsToKey(coords);
 
     const existingId = this.featureMap[key];
@@ -145,9 +145,38 @@ export class Database {
     }
     this.islandGenerations[this.currentIsland]++;
     this.lastIteration++;
-    this.currentIsland = (this.currentIsland + 1) % this.num_islands;
+    this.currentIsland = (this.currentIsland + 1) % this.numIslands;
 
     await this.save();
+  }
+
+  shouldMigrate() {
+    const maxGen = Math.max(...this.islandGenerations);
+    return (maxGen - this.lastMigrationGeneration) >= this.migrationInterval;
+  }
+
+  migratePrograms() {
+    if (this.numIslands < 2) return;
+
+    for (let i = 0; i < this.numIslands; i++) {
+      const islandProgramIds = [...this.islands[i]].filter((id) => id in this.programs);
+      if (islandProgramIds.length === 0) continue;
+
+      islandProgramIds.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+
+      const numToMigrate = Math.max(1, Math.floor(islandProgramIds.length * this.migrationRate));
+      const migrants = islandProgramIds.slice(0, numToMigrate);
+
+      const targets = [(i + 1) % this.numIslands, (i - 1 + this.numIslands) % this.numIslands];
+
+      for (const migrantId of migrants) {
+        for (const target of targets) {
+          this.islands[target].add(migrantId);
+        }
+      }
+    }
+
+    this.lastMigrationGeneration = Math.max(...this.islandGenerations);
   }
 
   getProgram(id) {
