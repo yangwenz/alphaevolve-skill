@@ -23,19 +23,6 @@ export class Program {
   }
 }
 
-function getFeatureCoords(program, featureBins) {
-  const keys = Object.keys(program.metrics).sort();
-  return keys.map((key) => {
-    const v = program.metrics[key];
-    if (typeof v !== 'number' || Number.isNaN(v)) return 0;
-    return Math.max(0, Math.min(Math.floor(v * featureBins), featureBins - 1));
-  });
-}
-
-function featureCoordsToKey(coords) {
-  return coords.join('-');
-}
-
 function avgMetrics(program) {
   const vals = Object.values(program.metrics).filter(
     (v) => typeof v === 'number' && !Number.isNaN(v)
@@ -52,7 +39,6 @@ function isBetter(program1, program2) {
 
 export class Database {
   constructor(savePath) {
-    this.featureBins = 10;
     this.numIslands = 3;
     this.migrationInterval = 10;
     this.migrationRate = 0.1;
@@ -60,7 +46,6 @@ export class Database {
     this.savePath = savePath;
 
     this.programs = {};
-    this.featureMap = {};
     this.islands = Array.from({ length: this.numIslands }, () => new Set());
     this.currentIsland = 0;
     this.islandGenerations = Array.from({ length: this.numIslands }, () => 0);
