@@ -66,6 +66,12 @@ export class Database {
     this.lastIteration = 0;
   }
 
+  static async create(savePath) {
+    const db = new Database(savePath);
+    await db.load();
+    return db;
+  }
+
   async save() {
     await fs.mkdir(this.savePath, { recursive: true });
 
