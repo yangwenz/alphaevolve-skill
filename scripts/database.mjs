@@ -6,7 +6,6 @@ export class Program {
     parentId = null,
     generation = 0,
     timestamp = Date.now() / 1000,
-    iterationFound = 0,
     metrics = {},
   }) {
     this.id = id;
@@ -15,33 +14,37 @@ export class Program {
     this.parentId = parentId;
     this.generation = generation;
     this.timestamp = timestamp;
-    this.iterationFound = iterationFound;
     this.metrics = metrics;
   }
+}
 
-  toDict() {
-    return {
-      id: this.id,
-      code: this.code,
-      language: this.language,
-      parent_id: this.parentId,
-      generation: this.generation,
-      timestamp: this.timestamp,
-      iteration_found: this.iterationFound,
-      metrics: this.metrics,
-    };
+export class Database {
+  constructor(savePath) {
+    this.feature_bins = 10;
+    this.num_islands = 3;
+    this.migration_interval = 10;
+    this.migration_rate = 0.1;
+    this.savePath = savePath;
+
+    this.programs = {};
+    this.featureMap = {};
+    this.islands = Array.from({ length: this.num_islands }, () => new Set());
+    this.currentIsland = 0;
+    this.islandGenerations = Array.from({ length: this.num_islands }, () => 0);
+    this.lastMigrationGeneration = 0;
+    this.bestProgramId = "";
+    this.lastIteration = 0;
   }
 
-  static fromDict(data) {
-    return new Program({
-      id: data.id,
-      code: data.code,
-      language: data.language ?? 'python',
-      parentId: data.parent_id ?? null,
-      generation: data.generation ?? 0,
-      timestamp: data.timestamp ?? Date.now() / 1000,
-      iterationFound: data.iteration_found ?? 0,
-      metrics: data.metrics ?? {},
-    });
+  addProgram(program) {
+    this.programs[program.id] = program;
+  }
+
+  getProgram(id) {
+    return this.programs[id] ?? null;
+  }
+
+  get bestProgram() {
+    return this.bestProgramId ? this.programs[this.bestProgramId] ?? null : null;
   }
 }
