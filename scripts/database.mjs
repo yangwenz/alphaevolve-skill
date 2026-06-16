@@ -21,16 +21,13 @@ export class Program {
   }
 }
 
-function calculateFeatureCoords(program, featureBins) {
-  const numericValues = Object.values(program.metrics).filter(
-    (v) => typeof v === 'number' && !Number.isNaN(v)
-  );
-  const avgScore =
-    numericValues.length > 0
-      ? numericValues.reduce((a, b) => a + b, 0) / numericValues.length
-      : 0;
-  const bin = Math.min(Math.floor(avgScore * featureBins), featureBins - 1);
-  return [Math.max(0, bin)];
+function getFeatureCoords(program, featureBins) {
+  const keys = Object.keys(program.metrics).sort();
+  return keys.map((key) => {
+    const v = program.metrics[key];
+    if (typeof v !== 'number' || Number.isNaN(v)) return 0;
+    return Math.max(0, Math.min(Math.floor(v * featureBins), featureBins - 1));
+  });
 }
 
 function featureCoordsToKey(coords) {
@@ -128,7 +125,7 @@ export class Database {
   addProgram(program) {
     this.programs[program.id] = program;
 
-    const coords = calculateFeatureCoords(program, this.feature_bins);
+    const coords = getFeatureCoords(program, this.feature_bins);
     const key = featureCoordsToKey(coords);
 
     const existingId = this.featureMap[key];
