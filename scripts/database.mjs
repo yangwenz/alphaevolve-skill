@@ -147,6 +147,9 @@ export class Database {
     this.lastIteration++;
     this.currentIsland = (this.currentIsland + 1) % this.numIslands;
 
+    if (this.shouldMigrate()) {
+      this.migratePrograms();
+    }
     await this.save();
   }
 
