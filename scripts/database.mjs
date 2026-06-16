@@ -21,6 +21,36 @@ export class Program {
   }
 }
 
+function calculateFeatureCoords(program, featureBins) {
+  const numericValues = Object.values(program.metrics).filter(
+    (v) => typeof v === 'number' && !Number.isNaN(v)
+  );
+  const avgScore =
+    numericValues.length > 0
+      ? numericValues.reduce((a, b) => a + b, 0) / numericValues.length
+      : 0;
+  const bin = Math.min(Math.floor(avgScore * featureBins), featureBins - 1);
+  return [Math.max(0, bin)];
+}
+
+function featureCoordsToKey(coords) {
+  return coords.join('-');
+}
+
+function avgMetrics(program) {
+  const vals = Object.values(program.metrics).filter(
+    (v) => typeof v === 'number' && !Number.isNaN(v)
+  );
+  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function isBetter(program1, program2) {
+  const score1 = avgMetrics(program1);
+  const score2 = avgMetrics(program2);
+  if (score1 !== score2) return score1 > score2;
+  return program1.timestamp > program2.timestamp;
+}
+
 export class Database {
   constructor(savePath) {
     this.feature_bins = 10;
@@ -97,6 +127,16 @@ export class Database {
 
   addProgram(program) {
     this.programs[program.id] = program;
+
+    const coords = calculateFeatureCoords(program, this.feature_bins);
+    const key = featureCoordsToKey(coords);
+
+    const existingId = this.featureMap[key];
+    if (!existingId || !(existingId in this.programs) || isBetter(program, this.programs[existingId])) {
+      this.featureMap[key] = program.id;
+    }
+
+    this.islands[this.currentIsland].add(program.id);
   }
 
   getProgram(id) {
