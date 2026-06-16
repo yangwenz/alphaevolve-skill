@@ -8,6 +8,7 @@ export class Program {
     language = 'python',
     parentId = null,
     generation = 0,
+    iterationFound = 0,
     timestamp = Date.now() / 1000,
     metrics = {},
   }) {
@@ -16,6 +17,7 @@ export class Program {
     this.language = language;
     this.parentId = parentId;
     this.generation = generation;
+    this.iterationFound = iterationFound;
     this.timestamp = timestamp;
     this.metrics = metrics;
   }
@@ -54,6 +56,7 @@ export class Database {
     this.numIslands = 3;
     this.migrationInterval = 10;
     this.migrationRate = 0.1;
+    this.explorationRatio = 0.3;
     this.savePath = savePath;
 
     this.programs = {};
@@ -129,6 +132,7 @@ export class Database {
   }
 
   async addProgram(program) {
+    program.iterationFound = this.lastIteration;
     this.programs[program.id] = program;
 
     const coords = getFeatureCoords(program, this.featureBins);
@@ -180,6 +184,38 @@ export class Database {
     }
 
     this.lastMigrationGeneration = Math.max(...this.islandGenerations);
+  }
+
+  sampleParent() {
+    const islandIds = [...this.islands[this.currentIsland]].filter(
+      (id) => id in this.programs
+    );
+    if (islandIds.length === 0) {
+      const initial = Object.values(this.programs).find((p) => p.iterationFound === 0);
+      if (initial) return initial;
+      const allIds = Object.keys(this.programs);
+      if (allIds.length === 0) return null;
+      return this.programs[allIds[Math.floor(Math.random() * allIds.length)]];
+    }
+
+    if (Math.random() < this.explorationRatio) {
+      const programs = islandIds.map((id) => this.programs[id]);
+      const scores = programs.map((p) => avgMetrics(p));
+      const maxScore = Math.max(...scores);
+      const temperature = 1.0;
+      const weights = scores.map((s) => Math.exp((s - maxScore) / temperature));
+      const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+      let r = Math.random() * totalWeight;
+      for (let i = 0; i < programs.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return programs[i];
+      }
+      return programs[programs.length - 1];
+    }
+
+    const programs = islandIds.map((id) => this.programs[id]);
+    return programs.reduce((best, p) => isBetter(p, best) ? p : best);
   }
 
   getProgram(id) {
