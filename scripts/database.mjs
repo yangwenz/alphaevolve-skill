@@ -122,7 +122,7 @@ export class Database {
     return true;
   }
 
-  addProgram(program) {
+  async addProgram(program) {
     this.programs[program.id] = program;
 
     const coords = getFeatureCoords(program, this.feature_bins);
@@ -132,8 +132,16 @@ export class Database {
     if (!existingId || !(existingId in this.programs) || isBetter(program, this.programs[existingId])) {
       this.featureMap[key] = program.id;
     }
-
     this.islands[this.currentIsland].add(program.id);
+
+    if (!this.bestProgramId || !(this.bestProgramId in this.programs) || isBetter(program, this.programs[this.bestProgramId])) {
+      this.bestProgramId = program.id;
+    }
+    this.islandGenerations[this.currentIsland]++;
+    this.lastIteration++;
+    this.currentIsland = (this.currentIsland + 1) % this.num_islands;
+
+    await this.save();
   }
 
   getProgram(id) {
