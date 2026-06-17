@@ -152,7 +152,9 @@ export class Database {
 
       for (const migrantId of migrants) {
         for (const target of targets) {
-          this.islands[target].add(migrantId);
+          if (!this.islands[target].has(migrantId)) {
+            this.islands[target].add(migrantId);
+          }
         }
       }
     }
