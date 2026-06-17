@@ -38,6 +38,7 @@ function isBetter(program1, program2) {
 export class Database {
   constructor(savePath) {
     this.numIslands = 3;
+    this.maxIslandSize = 40;
     this.migrationInterval = 10;
     this.migrationRate = 0.1;
     this.explorationRatio = 0.3;
@@ -63,6 +64,7 @@ export class Database {
 
     const data = {
       numIslands: this.numIslands,
+      maxIslandSize: this.maxIslandSize,
       migrationInterval: this.migrationInterval,
       migrationRate: this.migrationRate,
       explorationRatio: this.explorationRatio,
@@ -96,6 +98,7 @@ export class Database {
     const data = JSON.parse(raw);
 
     this.numIslands = data.numIslands;
+    this.maxIslandSize = data.maxIslandSize ?? this.maxIslandSize;
     this.migrationInterval = data.migrationInterval;
     this.migrationRate = data.migrationRate;
     this.explorationRatio = data.explorationRatio ?? this.explorationRatio;
@@ -128,6 +131,9 @@ export class Database {
     if (this.shouldMigrate()) {
       this.migratePrograms();
     }
+    for (let i = 0; i < this.numIslands; i++) {
+      this.pruneIsland(i);
+    }
     await this.save();
   }
 
@@ -157,6 +163,21 @@ export class Database {
       }
     }
     this.lastMigrationGeneration = Math.max(...this.islandGenerations);
+  }
+
+  pruneIsland(islandIndex) {
+    const island = this.islands[islandIndex];
+    if (island.size <= this.maxIslandSize) return;
+
+    const ids = [...island].filter((id) => Object.hasOwn(this.programs, id));
+    ids.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+    const toRemove = ids.slice(this.maxIslandSize);
+    for (const id of toRemove) {
+      island.delete(id);
+      if (!this.islands.some((s) => s.has(id))) {
+        delete this.programs[id];
+      }
+    }
   }
 
   sampleParent() {
