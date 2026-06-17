@@ -26,6 +26,7 @@ Infer the following from the user's request:
 | disambiguator | Optional | none (ask only if multiple matches found) |
 | number of iterations | Optional | 10 |
 | optimization goal | Optional | "optimize code efficiency — make the code faster and with less anti-patterns" |
+| test command | Optional | none (skip correctness gate) |
 | eval command | Optional | none (LLM evaluator only) |
 
 If either required input cannot be inferred, **ask the user** before proceeding.
@@ -40,6 +41,10 @@ If either required input cannot be inferred, **ask the user** before proceeding.
 ### Step 1: Setup Output Directory & Load Database
 
 All paths prefixed with `scripts/` or `references/` are relative to the skill's installation directory (the directory containing this `SKILL.md` file). Resolve this directory first and use absolute paths when invoking these files (e.g., `node /absolute/path/to/scripts/db-cli.mjs`).
+
+**Key path definitions used throughout this document:**
+- `<original_target_file>` — the user-provided target file path (the file being optimized, at its original location in the project).
+- `<candidate_file>` — the absolute path `evolve-output/candidates/iteration_<i>.<ext>` for the current iteration.
 
 Ensure the directory structure exists:
 
@@ -144,8 +149,8 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
    CONSTRAINTS:
    - Same function/method/class signature — do not rename or change parameters.
    - Must remain correct — do not sacrifice correctness for performance.
-   - Edit the file in place. Only modify the target `{target_name}`.
-   - After editing, respond with a one-line CHANGES summary of what you did and why.
+   - Edit the file in place. Focus on optimizing the target `{target_name}`. You may modify other parts of the file (e.g., adding imports) only if necessary to support your optimization.
+   - After editing, respond with a CHANGES summary of what you did and why.
    ```
 
 The subagent edits `evolve-output/candidates/iteration_<i>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
@@ -162,16 +167,14 @@ After the subagent finishes:
 
 #### 4e. Evaluate the Candidate
 
-`<original_target_file>` refers to the user-provided target file path (the file being optimized, at its original location in the project). `<candidate_file>` is the absolute path `evolve-output/candidates/iteration_<i>.<ext>`.
+Uses `<original_target_file>` and `<candidate_file>` as defined in Step 1.
 
-**Step 1 — Correctness gate (run first, always attempt):**
-- Detect the project's test runner (check `package.json` scripts, `Makefile`, or common patterns).
+**Step 1 — Correctness gate (run first; skip entirely if no test command was provided in Step 0):**
 - Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
 - Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
-- Run tests.
+- Run the test command provided by the user in Step 0.
 - **Always** restore the original, even if tests fail: `mv <original_target_file>.bak <original_target_file>`
 - If tests fail: **discard this candidate and continue to the next iteration** (skip the remaining evaluation steps).
-- If no test runner is detected, skip this gate and note it in the output.
 
 **Step 2 — LLM-as-judge evaluator** (using `<skill_dir>/references/evaluator.md`):
 1. Use the `targetCode` extracted in 4d (just the target function/method/class, not the full file).
@@ -207,12 +210,12 @@ node <skill_dir>/scripts/db-cli.mjs add evolve-output/database \
   --targetCode "$(cat /tmp/target_code.txt)" \
   --parentId "<parent.id from 4a>" \
   --metrics '{"efficiency-score": 0.7, "benchmark-score": 0.8}' \
-  --changes "one-line summary from subagent"
+  --changes "$(cat /tmp/changes.txt)"
 ```
 
 This outputs JSON: `{ "id", "metrics", "bestProgramId", "bestMetrics", "lastIteration" }`.
 
-Note: Write `targetCode` to a temp file first to avoid shell quoting issues with multi-line code. Omit `"benchmark-score"` from metrics if no eval_command.
+Note: Write `targetCode` and `changes` to temp files first to avoid shell quoting issues with multi-line content. Omit `"benchmark-score"` from metrics if no eval_command.
 
 #### 4g. Report Progress
 
