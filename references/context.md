@@ -93,9 +93,3 @@ Use the following markdown format for the output file:
 (repeat for each dependency)
 
 ---
-
-## Caching Behavior
-
-- Before extracting, check if the output file already exists. If it does, read and use it directly.
-- If the source file has changed since extraction (compare file modification time to the `extracted_at` line in the context file if present), re-extract.
-- The optimization loop should call this step with the file path and target name, and receive the context markdown content back for inclusion in prompts.
