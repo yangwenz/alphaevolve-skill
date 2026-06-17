@@ -42,13 +42,9 @@ node scripts/db-cli.mjs info evolve-output/database
 
 This outputs JSON: `{ "isEmpty": bool, "lastIteration": int, "programCount": int, "bestMetrics": object|null, "seedCodePath": string|null, "seedTargetCode": string|null }`.
 
-If `isEmpty` is false, determine whether the database targets the same file and function by comparing:
-- `seedCodePath` equals the current target file's absolute path, AND
-- `seedTargetCode` contains a declaration of the target (match the function/class/method declaration keyword followed by the target name — e.g., `function targetName` or `def targetName` or `class targetName`).
-
-Based on the comparison:
-- **Same target**: keep the directory intact (resume mode). Report: "Resuming from iteration {lastIteration}. Current best score: {bestMetrics}". Skip Step 3 (seeding).
-- **Different target**: remove the directory and start fresh — `rm -rf evolve-output/` — then re-run `mkdir -p` and the `info` command above.
+If `isEmpty` is false, **ask the user**: "An existing evolution run was found ({programCount} programs, best score: {bestMetrics}). Resume or start fresh?"
+- **Resume**: keep the directory intact. Report: "Resuming from iteration {lastIteration}. Current best score: {bestMetrics}". Skip Step 3 (seeding).
+- **Start fresh**: `rm -rf evolve-output/` — then re-run `mkdir -p` and the `info` command above.
 
 ### Step 2: Extract Context
 
@@ -256,7 +252,7 @@ After all iterations complete:
 
 ## Resuming
 
-If `evolve-output/database/database.json` exists with programs (i.e., `info` returns `isEmpty: false` and targets the same file/function):
+When the user chooses "Resume" in Step 1:
 - Skip seeding (Step 3).
 - The loop counter `i` starts from `lastIteration + 1` and runs for N additional iterations (so `i` goes from `lastIteration + 1` to `lastIteration + N`).
 - Report current best before continuing.
