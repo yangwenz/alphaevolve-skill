@@ -82,14 +82,14 @@ Only if the database is empty (`isEmpty` is true from the `info` command):
    node <skill_dir>/scripts/db-cli.mjs seed evolve-output/database \
      --codePath "/absolute/path/to/target/file.ext" \
      --targetCode "extracted target code" \
-     --metrics '{"efficiency-score": 0.7}'
+     --metrics 'evaluation metrics'
    ```
    Note: `--targetCode` and `--metrics` values must be properly shell-escaped. For multi-line targetCode, write it to a temp file and use `--targetCode "$(cat /tmp/target_code.txt)"`.
 5. Report: "Baseline score: {metrics}. Starting evolution."
 
 ### Step 4: Evolution Loop
 
-Repeat for each iteration `i` from 1 to N (default N=10). The loop counter `i` always increments regardless of whether a candidate is accepted or discarded. On resume, `i` starts from `lastIteration + 1` (see Resuming section).
+Repeat for each iteration `i` from 1 to N (default N=10). On resume, `i` starts from `lastIteration + 1`. If a candidate is discarded (test failure, eval failure), skip to the next `i` — discarded iterations still consume one iteration out of N.
 
 **Before starting the loop** (especially on resume): check if `<original_target_file>.bak` exists. If it does, a previous run was interrupted mid-evaluation — restore it immediately: `mv <original_target_file>.bak <original_target_file>`.
 
@@ -124,7 +124,6 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
    You are an expert code optimizer. Your goal: {optimization_goal}.
    Modify the function/method/class `{target_name}` in the file `evolve-output/candidates/iteration_<i>.<ext>` to improve its efficiency.
    Edit the file in place. Do not change the signature (name, parameters, return type).
-   Do not modify anything outside the target.
    ```
 
 2. **Context** (from the extracted context file):
@@ -190,9 +189,9 @@ Uses `<original_target_file>` and `<candidate_file>` as defined in Step 1.
    - First, try parsing stdout as JSON. If valid JSON, look for a numeric value under any of these keys (in order): `score`, `result`, `value`. Use the first match.
    - If stdout is not valid JSON, find the last numeric value (integer or float) in the output and use that.
    - If no numeric value can be found, report an error to the user and halt the entire evolution run.
-5. If the command exits non-zero, report the error and halt the entire evolution run.
-6. Validate the score is in [0.0, 1.0]. If out of range, report an error to the user and halt the entire evolution run.
-7. **Always** restore the original: `mv <original_target_file>.bak <original_target_file>`
+5. If the command exits non-zero, restore the original (`mv <original_target_file>.bak <original_target_file>`), report the error, and halt the entire evolution run.
+6. Validate the score is in [0.0, 1.0]. If out of range, restore the original (`mv <original_target_file>.bak <original_target_file>`), report an error to the user, and halt the entire evolution run.
+7. **Always** restore the original (if `.bak` still exists): `mv <original_target_file>.bak <original_target_file>`
 
 **Final score:**
 - LLM evaluator only: `final_score = llm_score`
