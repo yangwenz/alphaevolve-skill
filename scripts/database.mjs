@@ -193,6 +193,25 @@ export class Database {
     }
   }
 
+  sampleInspirations() {
+    const islandIds = [...this.islands[this.currentIsland]].filter(
+      (id) => Object.hasOwn(this.programs, id)
+    );
+    if (islandIds.length === 0) return [];
+
+    const sorted = islandIds.slice().sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
+    const topK = sorted.slice(0, Math.min(5, sorted.length));
+    const shuffledTop = topK.sort(() => Math.random() - 0.5);
+    const elites = shuffledTop.slice(0, Math.min(3, shuffledTop.length));
+
+    const eliteSet = new Set(elites);
+    const rest = islandIds.filter((id) => !eliteSet.has(id));
+    const shuffledRest = rest.sort(() => Math.random() - 0.5);
+    const exploratory = shuffledRest.slice(0, Math.min(2, shuffledRest.length));
+
+    return [...elites, ...exploratory].map((id) => this.programs[id]);
+  }
+
   sampleParent() {
     const islandIds = [...this.islands[this.currentIsland]].filter(
       (id) => Object.hasOwn(this.programs, id)
