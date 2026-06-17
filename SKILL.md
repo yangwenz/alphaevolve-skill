@@ -155,6 +155,8 @@ After the subagent finishes:
 
 #### 5e. Evaluate the Candidate
 
+`<original_target_file>` refers to the user-provided target file path (the file being optimized, at its original location in the project).
+
 **Step 1 — Correctness gate (run first, always attempt):**
 - Detect the project's test runner (check `package.json` scripts, `Makefile`, or common patterns).
 - Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
