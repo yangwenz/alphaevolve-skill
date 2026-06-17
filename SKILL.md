@@ -56,20 +56,14 @@ node <skill_dir>/scripts/db-cli.mjs info evolve-output/database
 This outputs JSON: `{ "isEmpty": bool, "lastIteration": int, "programCount": int, "bestMetrics": object|null, "seedCodePath": string|null, "seedTargetCode": string|null }`.
 
 If `isEmpty` is false, **ask the user**: "An existing evolution run was found ({programCount} programs, best score: {bestMetrics}). Resume or start fresh?"
-- **Resume**: keep the directory intact. Report: "Resuming from iteration {lastIteration}. Current best score: {bestMetrics}". Skip Step 3 (seeding).
+- **Resume**: keep the directory intact. Report: "Resuming from iteration {lastIteration}. Current best score: {bestMetrics}". Skip Steps 2 and 3 (context extraction and seeding).
 - **Start fresh**: `rm -rf evolve-output/` — then re-run `mkdir -p` and the `info` command above.
 
 ### Step 2: Extract Context
 
-Follow the procedure in `<skill_dir>/references/context.md`:
+Follow the canonical procedure in `<skill_dir>/references/context.md` (that file is authoritative — the summary below is for orientation only).
 
-1. Read the target file.
-2. Locate the target (using disambiguator if needed).
-3. Extract imports that the target depends on.
-4. Write a 1-2 sentence goal description of what the target does.
-5. Extract dependency signatures (functions/classes the target calls).
-6. Save to `evolve-output/context/<filename>_<target_name>.md`.
-7. If the context file already exists, compare the source file's modification time (`stat -f %m <file>` on macOS or `stat -c %Y <file>` on Linux) against the context file's modification time. If the source is newer, re-extract. Otherwise, reuse the existing context file.
+In brief: read the target file, locate the target, extract its imports and dependency signatures, write a goal description, and save the result to `evolve-output/context/<filename>_<target_name>.md`. If the context file already exists, reuse it without re-extracting.
 
 ### Step 3: Seed the Population
 
@@ -91,6 +85,8 @@ Only if the database is empty (`isEmpty` is true from the `info` command):
 ### Step 4: Evolution Loop
 
 Repeat for each iteration `i` from 1 to N (default N=10). The loop counter `i` always increments regardless of whether a candidate is accepted or discarded. On resume, `i` starts from `lastIteration + 1` (see Resuming section).
+
+**Before starting the loop** (especially on resume): check if `<original_target_file>.bak` exists. If it does, a previous run was interrupted mid-evaluation — restore it immediately: `mv <original_target_file>.bak <original_target_file>`.
 
 #### 4a. Sample Parent and Inspirations
 
@@ -154,7 +150,7 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
 
 The subagent edits `evolve-output/candidates/iteration_<i>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
 
-If the subagent fails (errors out, times out, or leaves the file unchanged from the parent), retry the subagent once with the same prompt. If it fails again, discard this iteration and continue to the next.
+If the subagent fails (errors out, times out), retry the subagent once with the same prompt. If it fails again, discard this iteration and continue to the next.
 
 #### 4d. Read the Mutated Candidate
 
@@ -222,7 +218,7 @@ Note: Write `targetCode` to a temp file first to avoid shell quoting issues with
 
 After each iteration, print:
 ```
-Iteration <i>/<N> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <db.bestProgram.metrics>
+Iteration <i>/<N> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <bestMetrics>
   Δ <change summary>
 ```
 
@@ -248,22 +244,5 @@ After all iterations complete:
    ```
 4. Show the best implementation's target code (`best.targetCode`).
 5. **Ask the user**: "Apply this implementation to the original source file?"
-   - If yes: Read the original target file, replace only the target function/method/class with `best.targetCode` (preserving everything else in the file), and write the file back. Do NOT copy the entire candidate file over the original.
+   - If yes: copy the best candidate file over the original: `cp <best.codePath> <original_target_file>`.
    - If no: leave the original unchanged. The result is saved in `evolve-output/best/`.
-
-## Error Handling
-
-- **Target not found**: Report similar names in the file with their line numbers. Stop.
-- **Ambiguous target**: List all matches with line numbers and signatures. Ask the user to provide `line:<N>` or a signature. Stop until resolved.
-- **Evaluator broken on seed**: If the LLM evaluator or eval_command fails on the initial implementation, report the error and stop — the evaluation setup is misconfigured.
-- **Multiple consecutive candidates rejected**: If 3+ consecutive candidates are discarded (test failures or evaluator failures), report "Multiple consecutive candidates failed — mutations may be too aggressive or the test suite is brittle." Continue to next iteration with existing population.
-- **Database corrupted**: Back up the corrupted `database.json`, delete it, and start fresh.
-
-## Resuming
-
-When the user chooses "Resume" in Step 1:
-- Skip seeding (Step 3).
-- **Ask the user**: "Run N more iterations on top of existing progress, or complete up to iteration N total?"
-  - **N more**: the loop runs from `lastIteration + 1` to `lastIteration + N`.
-  - **Up to N total**: the loop runs from `lastIteration + 1` to `N`. If `lastIteration >= N`, report "Already at or past iteration N" and stop.
-- Report current best before continuing.
