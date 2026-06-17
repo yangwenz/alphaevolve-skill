@@ -18,7 +18,7 @@ After N iterations, the best candidate is presented with a before/after comparis
 ## Installation
 
 ```bash
-npx skills add https://github.com/yangwenz/alphaevolve-skill
+npx skills add https://github.com/yangwenz/alphaevolve-skill --skill alphaevolve-skill
 ```
 
 No dependencies to install — the database and CLI are plain ESM JavaScript (Node.js 18+).
