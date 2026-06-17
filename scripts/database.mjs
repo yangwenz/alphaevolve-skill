@@ -108,7 +108,7 @@ export class Database {
     this.programs = Object.fromEntries(
       Object.entries(data.programs).map(([id, p]) => [id, new Program(p)])
     );
-    this.islands = data.islands.map((arr) => new Set(arr));
+    this.islands = data.islands.map((arr) => new Set(arr.filter((id) => Object.hasOwn(this.programs, id))));
     this.currentIsland = data.currentIsland;
     this.islandGenerations = data.islandGenerations;
     this.lastMigrationGeneration = data.lastMigrationGeneration;
