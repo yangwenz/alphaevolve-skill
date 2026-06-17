@@ -57,11 +57,10 @@ Save the extracted context as a markdown file at:
 <output_directory>/<filename_without_ext>_<target_name>.md
 ```
 
-Use the following format for the output file:
+Use the following markdown format for the output file:
 
 ---
 
-```markdown
 # Context: <target_name>
 
 **File**: `<file_path>`
