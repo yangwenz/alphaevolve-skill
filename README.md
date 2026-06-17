@@ -33,7 +33,7 @@ No dependencies to install — the database and CLI are plain ESM JavaScript (No
 
 ## Usage
 
-In Claude Code, trigger the skill with natural language:
+In CLI, trigger the skill with natural language:
 
 ```
 evolve the function processItems in src/pipeline.ts
