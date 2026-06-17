@@ -34,16 +34,21 @@ Ensure the directory structure exists:
 mkdir -p evolve-output/database evolve-output/context evolve-output/candidates evolve-output/best
 ```
 
-Load the population database:
+All database interactions use the CLI wrapper at `scripts/db-cli.mjs`. Load/create the database and check its status:
 
-```javascript
-import { Database, Program } from './scripts/database.mjs';
-const db = await Database.create('evolve-output/database');
+```bash
+node scripts/db-cli.mjs info evolve-output/database
 ```
 
-If the database already has programs (`Object.keys(db.programs).length > 0`), determine whether it targets the same file and function. Get the seed program with `db.getSeedProgram()` and compare its `codePath` to the current target file path:
-- **Same target** (`codePath` matches the target file and the seed's `targetCode` contains the target name): keep the directory intact (resume mode). Report: "Resuming from iteration {db.lastIteration}. Current best score: {bestProgram.metrics}". Skip Step 3 (seeding).
-- **Different target**: remove the directory and start fresh — `rm -rf evolve-output/` — then re-run `mkdir -p` and `Database.create` above.
+This outputs JSON: `{ "isEmpty": bool, "lastIteration": int, "programCount": int, "bestMetrics": object|null, "seedCodePath": string|null, "seedTargetCode": string|null }`.
+
+If `isEmpty` is false, determine whether the database targets the same file and function by comparing:
+- `seedCodePath` equals the current target file's absolute path, AND
+- `seedTargetCode` contains a declaration of the target (match the function/class/method declaration keyword followed by the target name — e.g., `function targetName` or `def targetName` or `class targetName`).
+
+Based on the comparison:
+- **Same target**: keep the directory intact (resume mode). Report: "Resuming from iteration {lastIteration}. Current best score: {bestMetrics}". Skip Step 3 (seeding).
+- **Different target**: remove the directory and start fresh — `rm -rf evolve-output/` — then re-run `mkdir -p` and the `info` command above.
 
 ### Step 2: Extract Context
 
@@ -55,43 +60,42 @@ Follow the procedure in `references/context.md`:
 4. Write a 1-2 sentence goal description of what the target does.
 5. Extract dependency signatures (functions/classes the target calls).
 6. Save to `evolve-output/context/<filename>_<target_name>.md`.
-7. If the context file already exists and the source file hasn't changed, reuse it.
+7. If the context file already exists, compare the source file's modification time (`stat -f %m <file>` on macOS or `stat -c %Y <file>` on Linux) against the context file's modification time. If the source is newer, re-extract. Otherwise, reuse the existing context file.
 
 ### Step 3: Seed the Population
 
-Only if the database is empty:
+Only if the database is empty (`isEmpty` is true from the `info` command):
 
 1. The target file is the seed candidate. Its absolute path will be stored as `codePath`.
-2. Extract the target function/method/class code from the file.
-3. Evaluate it (see Step 4e) to get a baseline score.
-4. Create a Program with the file path and the target code:
-   ```javascript
-   const seed = new Program({
-     codePath: absolutePathToTargetFile,  // absolute path to the file
-     targetCode: targetCodeOnly,          // just the target function/method/class
-     parentId: "0",
-     metrics: baselineMetrics,
-     changes: "initial implementation"
-   });
-   await db.addProgram(seed);
+2. Extract the target function/method/class code from the file (the exact source text).
+3. Evaluate it using the full evaluation procedure in Step 4e (correctness gate + LLM evaluator + optional command evaluator) to get a baseline score. If the evaluation fails on the seed, report the error and stop — the evaluation setup is misconfigured.
+4. Add the seed program:
+   ```bash
+   node scripts/db-cli.mjs seed evolve-output/database \
+     --codePath "/absolute/path/to/target/file.ext" \
+     --targetCode "extracted target code" \
+     --metrics '{"efficiency-score": 0.7}'
    ```
+   Note: `--targetCode` and `--metrics` values must be properly shell-escaped. For multi-line targetCode, write it to a temp file and use `--targetCode "$(cat /tmp/target_code.txt)"`.
 5. Report: "Baseline score: {metrics}. Starting evolution."
 
 ### Step 4: Evolution Loop
 
-Repeat for each iteration `i` from 1 to N (default N=10):
+Repeat for each iteration `i` from 1 to N (default N=10). The loop counter `i` always increments regardless of whether a candidate is accepted or discarded. On resume, `i` starts from `lastIteration + 1` (see Resuming section).
 
 #### 4a. Sample Parent and Inspirations
 
-```javascript
-const { parent, inspirations } = db.sample();
+```bash
+node scripts/db-cli.mjs sample evolve-output/database
 ```
 
-If parent is null, report an error and stop.
+This outputs JSON: `{ "parent": { "id", "codePath", "targetCode", "metrics", "changes" }, "inspirations": [...] }`.
+
+If `parent` is null, report an error and stop.
 
 #### 4b. Write Parent to Disk
 
-Copy the parent's file to the candidate path for this iteration:
+Copy the parent's file to the candidate path for this iteration. `<ext>` is the file extension from the original target file (e.g., `.py`, `.ts`, `.js`):
 
 ```bash
 cp <parent.codePath> evolve-output/candidates/iteration_<i>.<ext>
@@ -157,20 +161,20 @@ After the subagent finishes:
 
 #### 4e. Evaluate the Candidate
 
-`<original_target_file>` refers to the user-provided target file path (the file being optimized, at its original location in the project).
+`<original_target_file>` refers to the user-provided target file path (the file being optimized, at its original location in the project). `<candidate_file>` is the absolute path `evolve-output/candidates/iteration_<i>.<ext>`.
 
 **Step 1 — Correctness gate (run first, always attempt):**
 - Detect the project's test runner (check `package.json` scripts, `Makefile`, or common patterns).
 - Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
 - Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
 - Run tests.
-- Restore the original: `mv <original_target_file>.bak <original_target_file>`
+- **Always** restore the original, even if tests fail: `mv <original_target_file>.bak <original_target_file>`
 - If tests fail: **discard this candidate and continue to the next iteration** (skip the remaining evaluation steps).
 - If no test runner is detected, skip this gate and note it in the output.
 
-**Step 2 — LLM-as-judge evaluator** (using the system prompt from `references/evaluator.md`):
+**Step 2 — LLM-as-judge evaluator** (using `references/evaluator.md`):
 1. Use the `targetCode` extracted in 4d (just the target function/method/class, not the full file).
-2. Spawn a subagent with the contents of `references/evaluator.md` as its system prompt. Pass the `targetCode` as the user message.
+2. Spawn a subagent whose prompt begins with the full contents of `references/evaluator.md`, followed by a separator line (`---`), followed by the `targetCode`.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`. If parsing fails (invalid JSON, missing key, or score outside 1–10), retry the subagent once. If it fails again, discard this candidate and continue to the next iteration.
 4. Compute: `llm_score = efficiency_score / 10.0`.
 
@@ -178,10 +182,13 @@ After the subagent finishes:
 1. Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
 2. Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
 3. Execute the eval_command (no `$FILE` substitution — it runs against the code at its original path).
-4. Extract `cmd_score` from the command's stdout: try parsing as JSON first, otherwise treat as plain text. In either case, infer which numeric value represents the score.
-5. If the command exits non-zero or no numeric value can be extracted from the output, report an error to the user and halt the entire evolution run.
-6. Validate the score is in [0.0, 1.0]. If the score is greater than 1.0 or less than 0.0, report an error to the user and halt the entire evolution run.
-7. Restore the original: `mv <original_target_file>.bak <original_target_file>`
+4. Extract `cmd_score` from the command's stdout:
+   - First, try parsing stdout as JSON. If valid JSON, look for a numeric value under any of these keys (in order): `score`, `result`, `value`. Use the first match.
+   - If stdout is not valid JSON, find the last numeric value (integer or float) in the output and use that.
+   - If no numeric value can be found, report an error to the user and halt the entire evolution run.
+5. If the command exits non-zero, report the error and halt the entire evolution run.
+6. Validate the score is in [0.0, 1.0]. If out of range, report an error to the user and halt the entire evolution run.
+7. **Always** restore the original: `mv <original_target_file>.bak <original_target_file>`
 
 **Final score:**
 - LLM evaluator only: `final_score = llm_score`
@@ -191,17 +198,20 @@ Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark
 
 #### 4f. Update Population
 
-Create and add the program (codePath is the absolute path to the candidate file from 4d, targetCode and changes come from 4d):
-```javascript
-const candidate = new Program({
-  codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<i>.<ext>
-  targetCode: targetCodeOnly,             // just the modified target function/method/class
-  parentId: parent.id,
-  metrics: metrics,                       // { "efficiency-score": llmScore, "benchmark-score": cmdScore } — omit "benchmark-score" if no eval_command
-  changes: changesFromSubagent
-});
-await db.addProgram(candidate);
+Add the candidate to the database (codePath is the absolute path to the candidate file from 4d, targetCode and changes come from 4d):
+
+```bash
+node scripts/db-cli.mjs add evolve-output/database \
+  --codePath "/absolute/path/to/evolve-output/candidates/iteration_<i>.<ext>" \
+  --targetCode "$(cat /tmp/target_code.txt)" \
+  --parentId "<parent.id from 4a>" \
+  --metrics '{"efficiency-score": 0.7, "benchmark-score": 0.8}' \
+  --changes "one-line summary from subagent"
 ```
+
+This outputs JSON: `{ "id", "metrics", "bestProgramId", "bestMetrics", "lastIteration" }`.
+
+Note: Write `targetCode` to a temp file first to avoid shell quoting issues with multi-line code. Omit `"benchmark-score"` from metrics if no eval_command.
 
 #### 4g. Report Progress
 
@@ -215,20 +225,25 @@ Iteration <i>/<N> | efficiency-score: <llm_score> | benchmark-score: <cmd_score 
 
 After all iterations complete:
 
-1. Retrieve `db.bestProgram`.
-2. Copy the best candidate file to the output: `cp <db.bestProgram.codePath> evolve-output/best/<target_file_name>`.
+1. Retrieve the best program:
+   ```bash
+   node scripts/db-cli.mjs best evolve-output/database
+   ```
+   This outputs JSON: `{ "id", "codePath", "targetCode", "metrics", "changes", "iterationFound" }`.
+
+2. Copy the best candidate file to the output: `cp <best.codePath> evolve-output/best/<target_file_name>`.
 3. Report to the user:
    ```
    Evolution complete.
    Baseline: <seed metrics>
-   Best:     <best metrics> (iteration <i>)
+   Best:     <best metrics> (iteration <iterationFound>)
    Improvement: <delta or percentage>
 
    Strategy that worked best: <summarize from changes field>
    ```
-4. Show the best implementation's target code (`db.bestProgram.targetCode`).
+4. Show the best implementation's target code (`best.targetCode`).
 5. **Ask the user**: "Apply this implementation to the original source file?"
-   - If yes: `cp <db.bestProgram.codePath> <original target file>`.
+   - If yes: Read the original target file, replace only the target function/method/class with `best.targetCode` (preserving everything else in the file), and write the file back. Do NOT copy the entire candidate file over the original.
    - If no: leave the original unchanged. The result is saved in `evolve-output/best/`.
 
 ## Error Handling
@@ -236,12 +251,12 @@ After all iterations complete:
 - **Target not found**: Report similar names in the file with their line numbers. Stop.
 - **Ambiguous target**: List all matches with line numbers and signatures. Ask the user to provide `line:<N>` or a signature. Stop until resolved.
 - **Evaluator broken on seed**: If the LLM evaluator or eval_command fails on the initial implementation, report the error and stop — the evaluation setup is misconfigured.
-- **All candidates rejected in an iteration**: Report "All variants failed correctness this iteration — mutations may be too aggressive." Continue to next iteration with existing population.
+- **Multiple consecutive candidates rejected**: If 3+ consecutive candidates are discarded (test failures or evaluator failures), report "Multiple consecutive candidates failed — mutations may be too aggressive or the test suite is brittle." Continue to next iteration with existing population.
 - **Database corrupted**: Back up the corrupted `database.json`, delete it, and start fresh.
 
 ## Resuming
 
-If `evolve-output/database/database.json` exists with programs:
-- Skip seeding.
-- Start from iteration `db.lastIteration + 1`.
+If `evolve-output/database/database.json` exists with programs (i.e., `info` returns `isEmpty: false` and targets the same file/function):
+- Skip seeding (Step 3).
+- The loop counter `i` starts from `lastIteration + 1` and runs for N additional iterations (so `i` goes from `lastIteration + 1` to `lastIteration + N`).
 - Report current best before continuing.
