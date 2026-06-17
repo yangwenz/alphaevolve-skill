@@ -17,8 +17,22 @@ After N iterations, the best candidate is presented with a before/after comparis
 
 ## Installation
 
+Clone or download this repo into your Claude Code skills directory:
+
 ```bash
-npx skills add https://github.com/yangwenz/alphaevolve-skill --skill alphaevolve-skill
+git clone https://github.com/yangwenz/alphaevolve-skill.git ~/.claude/skills/alphaevolve-skill
+```
+
+Or copy the files manually into your global skills directory:
+
+```bash
+cp -r /path/to/alphaevolve-skill ~/.claude/skills/alphaevolve-skill
+```
+
+Or into a specific project:
+
+```bash
+cp -r /path/to/alphaevolve-skill your-project/.claude/skills/alphaevolve-skill
 ```
 
 No dependencies to install — the database and CLI are plain ESM JavaScript (Node.js 18+).
