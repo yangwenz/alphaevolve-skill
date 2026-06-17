@@ -64,14 +64,12 @@ export class Database {
     await fs.mkdir(this.savePath, { recursive: true });
 
     const data = {
-      featureBins: this.featureBins,
       numIslands: this.numIslands,
       migrationInterval: this.migrationInterval,
       migrationRate: this.migrationRate,
       programs: Object.fromEntries(
         Object.entries(this.programs).map(([id, p]) => [id, { ...p }])
       ),
-      featureMap: this.featureMap,
       islands: this.islands.map((s) => [...s]),
       currentIsland: this.currentIsland,
       islandGenerations: this.islandGenerations,
@@ -98,14 +96,12 @@ export class Database {
     }
     const data = JSON.parse(raw);
 
-    this.featureBins = data.featureBins;
     this.numIslands = data.numIslands;
     this.migrationInterval = data.migrationInterval;
     this.migrationRate = data.migrationRate;
     this.programs = Object.fromEntries(
       Object.entries(data.programs).map(([id, p]) => [id, new Program(p)])
     );
-    this.featureMap = data.featureMap;
     this.islands = data.islands.map((arr) => new Set(arr));
     this.currentIsland = data.currentIsland;
     this.islandGenerations = data.islandGenerations;
@@ -120,13 +116,6 @@ export class Database {
     program.iterationFound = this.lastIteration;
     this.programs[program.id] = program;
 
-    const coords = getFeatureCoords(program, this.featureBins);
-    const key = featureCoordsToKey(coords);
-
-    const existingId = this.featureMap[key];
-    if (!existingId || !(existingId in this.programs) || isBetter(program, this.programs[existingId])) {
-      this.featureMap[key] = program.id;
-    }
     this.islands[this.currentIsland].add(program.id);
 
     if (!this.bestProgramId || !(this.bestProgramId in this.programs) || isBetter(program, this.programs[this.bestProgramId])) {
