@@ -132,13 +132,7 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
    ...
    ```
 
-4. **Mutation directive** (rotate to maintain diversity):
-   - Iterations 1–3: "Try a different algorithm or data structure."
-   - Iterations 4–6: "Optimize the hot path — reduce allocations, avoid branching, eliminate redundant computation."
-   - Iterations 7–9: "Try a fundamentally different approach to the problem."
-   - Iterations 10+: "Combine the best ideas from previous attempts into a single superior solution."
-
-5. **Constraints:**
+4. **Constraints:**
    ```
    CONSTRAINTS:
    - Same function/method/class signature — do not rename or change parameters.
