@@ -21,16 +21,13 @@ Evaluate the code across the following dimensions:
 - Are language-native constructs used where they outperform manual implementations (e.g., comprehensions, iterators, stream APIs, vectorized operations)?
 - Does the code avoid fighting the language's memory model or runtime characteristics?
 - Are appropriate types used to avoid unnecessary overhead (e.g., avoiding boxed types where primitives suffice, using stack allocation where heap is unnecessary)?
-- Does the code follow the language's concurrency idioms rather than imposing foreign patterns?
 
 ### 3. Anti-Pattern Detection
 
 - No string concatenation in tight loops where a builder or join is appropriate.
-- No synchronous blocking where async/parallel execution is viable.
 - No unnecessary object creation or copying on each iteration.
 - No quadratic or worse behavior hidden behind convenient but costly abstractions (e.g., repeated list searches instead of a set/map lookup).
 - No busy-waiting, polling without backoff, or spin loops.
-- No premature optimization that harms readability without measurable benefit.
 - No N+1 query patterns or repeated I/O calls inside loops.
 
 ### 4. Memory Efficiency
