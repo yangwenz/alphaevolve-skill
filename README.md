@@ -23,16 +23,10 @@ Install to Claude Code:
 npx skills add https://github.com/yangwenz/alphaevolve-skill --skill alphaevolve-skill -a claude-code
 ```
 
-Or clone into your global skills directory:
+Or Codex:
 
 ```bash
-git clone https://github.com/yangwenz/alphaevolve-skill.git ~/.claude/skills/alphaevolve-skill
-```
-
-Or copy into a specific project:
-
-```bash
-cp -r /path/to/alphaevolve-skill your-project/.claude/skills/alphaevolve-skill
+npx skills add https://github.com/yangwenz/alphaevolve-skill --skill alphaevolve-skill -a codex
 ```
 
 No dependencies to install — the database and CLI are plain ESM JavaScript (Node.js 18+).
