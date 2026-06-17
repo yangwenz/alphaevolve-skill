@@ -17,19 +17,19 @@ After N iterations, the best candidate is presented with a before/after comparis
 
 ## Installation
 
-Clone or download this repo into your Claude Code skills directory:
+Install to Claude Code:
+
+```bash
+npx skills add https://github.com/yangwenz/alphaevolve-skill --skill alphaevolve-skill -a claude-code
+```
+
+Or clone into your global skills directory:
 
 ```bash
 git clone https://github.com/yangwenz/alphaevolve-skill.git ~/.claude/skills/alphaevolve-skill
 ```
 
-Or copy the files manually into your global skills directory:
-
-```bash
-cp -r /path/to/alphaevolve-skill ~/.claude/skills/alphaevolve-skill
-```
-
-Or into a specific project:
+Or copy into a specific project:
 
 ```bash
 cp -r /path/to/alphaevolve-skill your-project/.claude/skills/alphaevolve-skill
