@@ -25,9 +25,10 @@ Evolve a target function/method/class through iterative mutation and selection, 
 
 ### Step 1: Setup Output Directory
 
-Create the output directory structure at `evolve-output/` (relative to project root):
+If `evolve-output/` already exists, remove it first, then create the directory structure:
 
 ```bash
+rm -rf evolve-output/
 mkdir -p evolve-output/database evolve-output/context evolve-output/candidates evolve-output/best
 ```
 
@@ -98,7 +99,7 @@ This gives the subagent a real file to edit in place.
 
 #### 5c. Dispatch Subagent to Mutate
 
-Spawn a subagent (Claude Code or Codex) with the following prompt. The subagent operates on the candidate file written in 5b and edits it directly using its tools.
+Spawn a subagent with the following prompt. The subagent operates on the candidate file written in 5b and edits it directly using its tools.
 
 **Subagent prompt — assemble in order:**
 
@@ -142,7 +143,7 @@ Spawn a subagent (Claude Code or Codex) with the following prompt. The subagent 
    - After editing, respond with a one-line CHANGES summary of what you did and why.
    ```
 
-The subagent edits `evolve-output/candidates/iteration_<N>.<ext>` using its coding tools (Read, Edit, Write) and returns a one-line `changes` summary.
+The subagent edits `evolve-output/candidates/iteration_<N>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
 
 #### 5d. Read the Mutated Candidate
 
@@ -150,6 +151,7 @@ After the subagent finishes:
 1. The candidate file is at `evolve-output/candidates/iteration_<N>.<ext>` (absolute path). This is the `codePath` for the new Program.
 2. Extract the target function/method/class from the candidate file — this is the `targetCode`.
 3. Capture the `changes` summary from the subagent's response.
+4. Record the parent's id (`parent.id`) — this will be used as `parentId` when creating the new Program.
 
 #### 5e. Evaluate the Candidate
 
