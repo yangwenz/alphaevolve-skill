@@ -53,6 +53,42 @@ export class Database {
     return db;
   }
 
+  async addProgram(program) {
+    program.iterationFound = this.lastIteration;
+    program.timestamp = Date.now() / 1000;
+    const parent = this.programs[program.parentId];
+    program.generation = parent ? parent.generation + 1 : 0;
+    this.programs[program.id] = program;
+    this.islands[this.currentIsland].add(program.id);
+
+    if (!this.bestProgramId || !Object.hasOwn(this.programs, this.bestProgramId) || 
+      isBetter(program, this.programs[this.bestProgramId])) {
+      this.bestProgramId = program.id;
+    }
+    this.islandGenerations[this.currentIsland]++;
+    this.lastIteration++;
+    this.currentIsland = (this.currentIsland + 1) % this.numIslands;
+
+    if (this._shouldMigrate()) {
+      this._migratePrograms();
+    }
+    for (let i = 0; i < this.numIslands; i++) {
+      this._pruneIsland(i);
+    }
+    await this._save();
+  }
+
+  sample() {
+    const parent = this._sampleParent();
+    if (!parent) return { parent: null, inspirations: [] };
+    const inspirations = this._sampleInspirations().filter((p) => p.id !== parent.id);
+    return { parent, inspirations };
+  }
+
+  get bestProgram() {
+    return this.bestProgramId ? this.programs[this.bestProgramId] ?? null : null;
+  }
+
   async _save() {
     await fs.mkdir(this.savePath, { recursive: true });
 
@@ -107,30 +143,6 @@ export class Database {
     return true;
   }
 
-  async addProgram(program) {
-    program.iterationFound = this.lastIteration;
-    program.timestamp = Date.now() / 1000;
-    const parent = this.programs[program.parentId];
-    program.generation = parent ? parent.generation + 1 : 0;
-    this.programs[program.id] = program;
-    this.islands[this.currentIsland].add(program.id);
-
-    if (!this.bestProgramId || !Object.hasOwn(this.programs, this.bestProgramId) || isBetter(program, this.programs[this.bestProgramId])) {
-      this.bestProgramId = program.id;
-    }
-    this.islandGenerations[this.currentIsland]++;
-    this.lastIteration++;
-    this.currentIsland = (this.currentIsland + 1) % this.numIslands;
-
-    if (this._shouldMigrate()) {
-      this._migratePrograms();
-    }
-    for (let i = 0; i < this.numIslands; i++) {
-      this._pruneIsland(i);
-    }
-    await this._save();
-  }
-
   _shouldMigrate() {
     const maxGen = Math.max(...this.islandGenerations);
     return (maxGen - this.lastMigrationGeneration) >= this.migrationInterval;
@@ -176,13 +188,6 @@ export class Database {
     }
   }
 
-  sample() {
-    const parent = this._sampleParent();
-    if (!parent) return { parent: null, inspirations: [] };
-    const inspirations = this._sampleInspirations().filter((p) => p.id !== parent.id);
-    return { parent, inspirations };
-  }
-
   _sampleParent() {
     const islandIds = [...this.islands[this.currentIsland]].filter(
       (id) => Object.hasOwn(this.programs, id)
@@ -220,14 +225,6 @@ export class Database {
     const exploratory = shuffledRest.slice(0, Math.min(2, shuffledRest.length));
 
     return [...elites, ...exploratory].map((id) => this.programs[id]);
-  }
-
-  _getProgram(id) {
-    return this.programs[id] ?? null;
-  }
-
-  get bestProgram() {
-    return this.bestProgramId ? this.programs[this.bestProgramId] ?? null : null;
   }
 }
 
