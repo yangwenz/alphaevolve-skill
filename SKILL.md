@@ -17,7 +17,18 @@ If `goal` is not provided, default to: "optimize code efficiency — make the co
 
 ### Step 0: Validate Inputs
 
-Infer the following from the user's request: target file, target name, disambiguator, number of iterations, optimization goal, and eval command. If any required input (target file or target name) cannot be inferred, **ask the user** before proceeding.
+Infer the following from the user's request:
+
+| Input | Required? | Default |
+|-------|-----------|---------|
+| target file | **Required** | — (ask user if not inferrable) |
+| target name | **Required** | — (ask user if not inferrable) |
+| disambiguator | Optional | none (ask only if multiple matches found) |
+| number of iterations | Optional | 10 |
+| optimization goal | Optional | "optimize code efficiency — make the code faster and with less anti-patterns" |
+| eval command | Optional | none (LLM evaluator only) |
+
+If either required input cannot be inferred, **ask the user** before proceeding.
 
 1. Verify the target file exists. If not, report the error and stop.
 2. Read the target file and locate the target by name.
