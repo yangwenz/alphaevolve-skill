@@ -83,7 +83,7 @@ Only if the database is empty:
 
 ### Step 5: Evolution Loop
 
-Repeat for each iteration from 1 to N (default N=10):
+Repeat for each iteration `i` from 1 to N (default N=10):
 
 #### 5a. Sample Parent and Inspirations
 
@@ -98,7 +98,7 @@ If parent is null, report an error and stop.
 Copy the parent's file to the candidate path for this iteration:
 
 ```bash
-cp <parent.codePath> evolve-output/candidates/iteration_<N>.<ext>
+cp <parent.codePath> evolve-output/candidates/iteration_<i>.<ext>
 ```
 
 This gives the subagent a real file to edit in place.
@@ -112,7 +112,7 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
 1. **Task:**
    ```
    You are an expert code optimizer. Your goal: {optimization_goal}.
-   Modify the function/method/class `{target_name}` in the file `evolve-output/candidates/iteration_<N>.<ext>` to improve its efficiency.
+   Modify the function/method/class `{target_name}` in the file `evolve-output/candidates/iteration_<i>.<ext>` to improve its efficiency.
    Edit the file in place. Do not change the signature (name, parameters, return type).
    Do not modify anything outside the target.
    ```
@@ -149,12 +149,12 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
    - After editing, respond with a one-line CHANGES summary of what you did and why.
    ```
 
-The subagent edits `evolve-output/candidates/iteration_<N>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
+The subagent edits `evolve-output/candidates/iteration_<i>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
 
 #### 5d. Read the Mutated Candidate
 
 After the subagent finishes:
-1. The candidate file is at `evolve-output/candidates/iteration_<N>.<ext>` (absolute path). This is the `codePath` for the new Program.
+1. The candidate file is at `evolve-output/candidates/iteration_<i>.<ext>` (absolute path). This is the `codePath` for the new Program.
 2. Extract the target function/method/class from the candidate file — this is the `targetCode`.
 3. Capture the `changes` summary from the subagent's response.
 4. Record the parent's id (`parent.id`) — this will be used as `parentId` when creating the new Program.
@@ -198,7 +198,7 @@ Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark
 Create and add the program (codePath is the absolute path to the candidate file from 5d, targetCode and changes come from 5d):
 ```javascript
 const candidate = new Program({
-  codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<N>.<ext>
+  codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<i>.<ext>
   targetCode: targetCodeOnly,             // just the modified target function/method/class
   parentId: parent.id,
   metrics: metrics,                       // { "efficiency-score": llmScore, "benchmark-score": cmdScore } — omit "benchmark-score" if no eval_command
@@ -211,7 +211,7 @@ await db.addProgram(candidate);
 
 After each iteration, print:
 ```
-Iteration <N>/<total> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <db.bestProgram.metrics>
+Iteration <i>/<N> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <db.bestProgram.metrics>
   Δ <change summary>
 ```
 
@@ -225,7 +225,7 @@ After all iterations complete:
    ```
    Evolution complete.
    Baseline: <seed metrics>
-   Best:     <best metrics> (iteration <N>)
+   Best:     <best metrics> (iteration <i>)
    Improvement: <delta or percentage>
 
    Strategy that worked best: <summarize from changes field>
