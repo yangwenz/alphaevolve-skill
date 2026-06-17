@@ -87,6 +87,10 @@ export class Database {
     return { parent, inspirations };
   }
 
+  getProgram(id) {
+    return this.programs[id] ?? null;
+  }
+
   get bestProgram() {
     return this.bestProgramId ? this.programs[this.bestProgramId] ?? null : null;
   }
@@ -228,23 +232,6 @@ export class Database {
 
     return [...elites, ...exploratory].map((id) => this.programs[id]);
   }
-}
-
-export function buildPrompt(parent, inspirations) {
-  let prompt = `# Parent Program\n\n${parent.targetCode}`;
-
-  if (inspirations.length > 0) {
-    prompt += '\n\n# Previous Attempts';
-    for (let i = 0; i < inspirations.length; i++) {
-      const p = inspirations[i];
-      const metricStr = Object.entries(p.metrics)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(', ');
-      prompt += `\n\n## Program ${i + 1}\n\nMetric: ${metricStr}\nChanges: ${p.changes}`;
-    }
-  }
-
-  return prompt;
 }
 
 function avgMetrics(program) {

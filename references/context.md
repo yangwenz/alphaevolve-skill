@@ -4,14 +4,14 @@ This document describes how to extract context information for a target method o
 
 ## When to Use
 
-Run this step once per optimization target before starting the evolution loop. Skip if a context file already exists at `output/context/<filename>_<target_name>.md`.
+Run this step once per optimization target before starting the evolution loop. Skip if a context file already exists at `evolve-output/context/<filename>_<target_name>.md`.
 
 ## Inputs
 
 - **File path**: The source file containing the target method or class.
 - **Target name**: The name of the method, function, or class to extract context for.
 - **Target disambiguator** (optional): A line number or partial signature to identify the exact overload when multiple methods share the same name. Examples: `line:42`, `(int, str) -> bool`, `(self, request: HttpRequest)`.
-- **Output directory**: Defaults to `output/context/` relative to the project root.
+- **Output directory**: Defaults to `evolve-output/context/` relative to the project root.
 
 ## Extraction Steps
 

@@ -28,8 +28,8 @@ Infer the following from the user's request: target file, target name, disambigu
 
 ### Step 1: Setup Output Directory
 
-If `evolve-output/` already exists, check the existing database to determine whether it targets the same file and function:
-- **Same target** (file path and target name match): keep the directory intact (resume mode).
+If `evolve-output/` already exists, check the existing database to determine whether it targets the same file and function. Find the seed program using `db.getProgram(id)` — iterate through programs to find the one where `parentId === "0"` — and compare its `codePath` to the current target file path:
+- **Same target** (`codePath` matches the target file and the seed's `targetCode` contains the target name): keep the directory intact (resume mode).
 - **Different target**: remove it and start fresh: `rm -rf evolve-output/`
 
 Then ensure the directory structure exists:
@@ -175,7 +175,7 @@ After the subagent finishes:
 **Step 2 — LLM-as-judge evaluator** (using the system prompt from `references/evaluator.md`):
 1. Use the `targetCode` extracted in 5d (just the target function/method/class, not the full file).
 2. Spawn a subagent with the contents of `references/evaluator.md` as its system prompt. Pass the `targetCode` as the user message.
-3. Parse the JSON response: `{"efficiency-score": <1-10>}`.
+3. Parse the JSON response: `{"efficiency-score": <1-10>}`. If parsing fails (invalid JSON, missing key, or score outside 1–10), retry the subagent once. If it fails again, discard this candidate and continue to the next iteration.
 4. Compute: `llm_score = efficiency_score / 10.0`.
 
 **Step 3 — Shell command evaluator** (only if an eval_command was provided):
@@ -183,8 +183,8 @@ After the subagent finishes:
 2. Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
 3. Execute the eval_command (no `$FILE` substitution — it runs against the code at its original path).
 4. Extract `cmd_score` from the command's stdout: try parsing as JSON first, otherwise treat as plain text. In either case, infer which numeric value represents the score.
-5. If the command exits non-zero or no numeric value can be extracted from the output, report an error to the user and stop.
-6. Validate the score is in [0.0, 1.0]. If the score is greater than 1.0 or less than 0.0, report an error to the user and stop.
+5. If the command exits non-zero or no numeric value can be extracted from the output, report an error to the user and halt the entire evolution run.
+6. Validate the score is in [0.0, 1.0]. If the score is greater than 1.0 or less than 0.0, report an error to the user and halt the entire evolution run.
 7. Restore the original: `mv <original_target_file>.bak <original_target_file>`
 
 **Final score:**
