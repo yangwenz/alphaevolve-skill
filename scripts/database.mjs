@@ -174,8 +174,9 @@ export class Database {
     if (Math.random() < this.explorationRatio) {
       return this.programs[islandIds[Math.floor(Math.random() * islandIds.length)]];
     }
-    const programs = islandIds.map((id) => this.programs[id]);
-    return programs.reduce((best, p) => isBetter(p, best) ? p : best);
+    const sorted = islandIds.slice().sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+    const k = Math.min(3, sorted.length);
+    return this.programs[sorted[Math.floor(Math.random() * k)]];
   }
 
   getProgram(id) {
