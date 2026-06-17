@@ -126,9 +126,10 @@ export class Database {
 
   async addProgram(program) {
     program.iterationFound = this.lastIteration;
-    program.timestamp = Date.now() / 1000
+    program.timestamp = Date.now() / 1000;
+    const parent = this.programs[program.parentId];
+    program.generation = parent ? parent.generation + 1 : 0;
     this.programs[program.id] = program;
-
     this.islands[this.currentIsland].add(program.id);
 
     if (!this.bestProgramId || !Object.hasOwn(this.programs, this.bestProgramId) || isBetter(program, this.programs[this.bestProgramId])) {
