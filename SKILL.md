@@ -26,30 +26,26 @@ Infer the following from the user's request: target file, target name, disambigu
    - If no disambiguator was provided, list all candidates with their line numbers and signatures, then **ask the user** which one to evolve.
 4. If no definition matches, report similar names found in the file and stop.
 
-### Step 1: Setup Output Directory
+### Step 1: Setup Output Directory & Load Database
 
-If `evolve-output/` already exists, check the existing database to determine whether it targets the same file and function. Find the seed program using `db.getProgram(id)` — iterate through programs to find the one where `parentId === "0"` — and compare its `codePath` to the current target file path:
-- **Same target** (`codePath` matches the target file and the seed's `targetCode` contains the target name): keep the directory intact (resume mode).
-- **Different target**: remove it and start fresh: `rm -rf evolve-output/`
-
-Then ensure the directory structure exists:
+Ensure the directory structure exists:
 
 ```bash
 mkdir -p evolve-output/database evolve-output/context evolve-output/candidates evolve-output/best
 ```
 
-### Step 2: Load Population Database
+Load the population database:
 
 ```javascript
 import { Database, Program } from './scripts/database.mjs';
 const db = await Database.create('evolve-output/database');
 ```
 
-If the database already has programs (resuming a previous run):
-- Report: "Resuming from iteration {db.lastIteration}. Current best score: {bestProgram.metrics}"
-- Skip Step 4 (seeding).
+If the database already has programs (`Object.keys(db.programs).length > 0`), determine whether it targets the same file and function. Get the seed program with `db.getSeedProgram()` and compare its `codePath` to the current target file path:
+- **Same target** (`codePath` matches the target file and the seed's `targetCode` contains the target name): keep the directory intact (resume mode). Report: "Resuming from iteration {db.lastIteration}. Current best score: {bestProgram.metrics}". Skip Step 3 (seeding).
+- **Different target**: remove the directory and start fresh — `rm -rf evolve-output/` — then re-run `mkdir -p` and `Database.create` above.
 
-### Step 3: Extract Context
+### Step 2: Extract Context
 
 Follow the procedure in `references/context.md`:
 
@@ -61,13 +57,13 @@ Follow the procedure in `references/context.md`:
 6. Save to `evolve-output/context/<filename>_<target_name>.md`.
 7. If the context file already exists and the source file hasn't changed, reuse it.
 
-### Step 4: Seed the Population
+### Step 3: Seed the Population
 
 Only if the database is empty:
 
 1. The target file is the seed candidate. Its absolute path will be stored as `codePath`.
 2. Extract the target function/method/class code from the file.
-3. Evaluate it (see Step 5e) to get a baseline score.
+3. Evaluate it (see Step 4e) to get a baseline score.
 4. Create a Program with the file path and the target code:
    ```javascript
    const seed = new Program({
@@ -81,11 +77,11 @@ Only if the database is empty:
    ```
 5. Report: "Baseline score: {metrics}. Starting evolution."
 
-### Step 5: Evolution Loop
+### Step 4: Evolution Loop
 
 Repeat for each iteration `i` from 1 to N (default N=10):
 
-#### 5a. Sample Parent and Inspirations
+#### 4a. Sample Parent and Inspirations
 
 ```javascript
 const { parent, inspirations } = db.sample();
@@ -93,7 +89,7 @@ const { parent, inspirations } = db.sample();
 
 If parent is null, report an error and stop.
 
-#### 5b. Write Parent to Disk
+#### 4b. Write Parent to Disk
 
 Copy the parent's file to the candidate path for this iteration:
 
@@ -103,9 +99,9 @@ cp <parent.codePath> evolve-output/candidates/iteration_<i>.<ext>
 
 This gives the subagent a real file to edit in place.
 
-#### 5c. Dispatch Subagent to Mutate
+#### 4c. Dispatch Subagent to Mutate
 
-Spawn a subagent with the following prompt. The subagent operates on the candidate file written in 5b and edits it directly using its tools.
+Spawn a subagent with the following prompt. The subagent operates on the candidate file written in 4b and edits it directly using its tools.
 
 **Subagent prompt — assemble in order:**
 
@@ -151,7 +147,7 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
 
 The subagent edits `evolve-output/candidates/iteration_<i>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
 
-#### 5d. Read the Mutated Candidate
+#### 4d. Read the Mutated Candidate
 
 After the subagent finishes:
 1. The candidate file is at `evolve-output/candidates/iteration_<i>.<ext>` (absolute path). This is the `codePath` for the new Program.
@@ -159,7 +155,7 @@ After the subagent finishes:
 3. Capture the `changes` summary from the subagent's response.
 4. Record the parent's id (`parent.id`) — this will be used as `parentId` when creating the new Program.
 
-#### 5e. Evaluate the Candidate
+#### 4e. Evaluate the Candidate
 
 `<original_target_file>` refers to the user-provided target file path (the file being optimized, at its original location in the project).
 
@@ -173,7 +169,7 @@ After the subagent finishes:
 - If no test runner is detected, skip this gate and note it in the output.
 
 **Step 2 — LLM-as-judge evaluator** (using the system prompt from `references/evaluator.md`):
-1. Use the `targetCode` extracted in 5d (just the target function/method/class, not the full file).
+1. Use the `targetCode` extracted in 4d (just the target function/method/class, not the full file).
 2. Spawn a subagent with the contents of `references/evaluator.md` as its system prompt. Pass the `targetCode` as the user message.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`. If parsing fails (invalid JSON, missing key, or score outside 1–10), retry the subagent once. If it fails again, discard this candidate and continue to the next iteration.
 4. Compute: `llm_score = efficiency_score / 10.0`.
@@ -193,9 +189,9 @@ After the subagent finishes:
 
 Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark-score": cmd_score }` (omit `"benchmark-score"` key if no eval_command).
 
-#### 5f. Update Population
+#### 4f. Update Population
 
-Create and add the program (codePath is the absolute path to the candidate file from 5d, targetCode and changes come from 5d):
+Create and add the program (codePath is the absolute path to the candidate file from 4d, targetCode and changes come from 4d):
 ```javascript
 const candidate = new Program({
   codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<i>.<ext>
@@ -207,7 +203,7 @@ const candidate = new Program({
 await db.addProgram(candidate);
 ```
 
-#### 5g. Report Progress
+#### 4g. Report Progress
 
 After each iteration, print:
 ```
@@ -215,7 +211,7 @@ Iteration <i>/<N> | efficiency-score: <llm_score> | benchmark-score: <cmd_score 
   Δ <change summary>
 ```
 
-### Step 6: Finalize
+### Step 5: Finalize
 
 After all iterations complete:
 

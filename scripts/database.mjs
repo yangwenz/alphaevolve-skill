@@ -87,8 +87,8 @@ export class Database {
     return { parent, inspirations };
   }
 
-  getProgram(id) {
-    return this.programs[id] ?? null;
+  getSeedProgram() {
+    return Object.values(this.programs).find(p => p.parentId === "0") ?? null;
   }
 
   get bestProgram() {
