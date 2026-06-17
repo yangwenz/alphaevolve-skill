@@ -1,20 +1,29 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 export class Program {
   constructor({
-    id,
     code,
     parentId = "0",
     metrics = {},
   }) {
-    this.id = id;
+    this.id = String(randomUUID());
     this.code = code;
     this.parentId = parentId;
     this.generation = 0;
     this.iterationFound = 0;
     this.timestamp = Date.now() / 1000;
     this.metrics = metrics;
+  }
+
+  static fromJSON(data) {
+    const program = new Program(data);
+    program.id = data.id;
+    program.generation = data.generation ?? 0;
+    program.iterationFound = data.iterationFound ?? 0;
+    program.timestamp = data.timestamp ?? 0;
+    return program;
   }
 }
 
@@ -102,9 +111,7 @@ export class Database {
     this.migrationInterval = data.migrationInterval;
     this.migrationRate = data.migrationRate;
     this.explorationRatio = data.explorationRatio ?? this.explorationRatio;
-    this.programs = Object.fromEntries(
-      Object.entries(data.programs).map(([id, p]) => [id, new Program(p)])
-    );
+    this.programs = Object.fromEntries(Object.values(data.programs).map((p) => [p.id, Program.fromJSON(p)]));
     this.islands = data.islands.map((arr) => new Set(arr.filter((id) => Object.hasOwn(this.programs, id))));
     this.currentIsland = data.currentIsland;
     this.islandGenerations = data.islandGenerations;
