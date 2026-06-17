@@ -4,13 +4,15 @@ import { randomUUID } from 'crypto';
 
 export class Program {
   constructor({
-    code,
+    codePath,
+    targetCode = "",
     parentId = "0",
     metrics = {},
     changes = ""
   }) {
     this.id = String(randomUUID());
-    this.code = code;
+    this.codePath = codePath;
+    this.targetCode = targetCode;
     this.parentId = parentId;
     this.generation = 0;
     this.iterationFound = 0;
@@ -229,7 +231,7 @@ export class Database {
 }
 
 export function buildPrompt(parent, inspirations) {
-  let prompt = `# Parent Program\n\n${parent.code}`;
+  let prompt = `# Parent Program\n\n${parent.targetCode}`;
 
   if (inspirations.length > 0) {
     prompt += '\n\n# Previous Attempts';

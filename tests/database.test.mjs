@@ -17,8 +17,8 @@ afterEach(async () => {
 
 describe('Program', () => {
   it('constructor sets fields from arguments', () => {
-    const p = new Program({ code: 'fn()', parentId: 'p1', metrics: { acc: 0.9 }, changes: 'diff' });
-    assert.equal(p.code, 'fn()');
+    const p = new Program({ codePath: 'fn()', parentId: 'p1', metrics: { acc: 0.9 }, changes: 'diff' });
+    assert.equal(p.codePath, 'fn()');
     assert.equal(p.parentId, 'p1');
     assert.deepEqual(p.metrics, { acc: 0.9 });
     assert.equal(p.changes, 'diff');
@@ -30,7 +30,7 @@ describe('Program', () => {
   });
 
   it('constructor uses defaults for optional fields', () => {
-    const p = new Program({ code: 'x' });
+    const p = new Program({ codePath: 'x' });
     assert.equal(p.parentId, '0');
     assert.deepEqual(p.metrics, {});
     assert.equal(p.changes, '');
@@ -39,7 +39,7 @@ describe('Program', () => {
   it('fromJSON restores all fields', () => {
     const data = {
       id: 'abc-123',
-      code: 'code',
+      codePath: 'code',
       parentId: 'p2',
       metrics: { f1: 0.8 },
       changes: 'c',
@@ -49,14 +49,14 @@ describe('Program', () => {
     };
     const p = Program.fromJSON(data);
     assert.equal(p.id, 'abc-123');
-    assert.equal(p.code, 'code');
+    assert.equal(p.codePath, 'code');
     assert.equal(p.generation, 5);
     assert.equal(p.iterationFound, 3);
     assert.equal(p.timestamp, 1000);
   });
 
   it('fromJSON uses defaults for missing optional fields', () => {
-    const p = Program.fromJSON({ id: 'x', code: 'y' });
+    const p = Program.fromJSON({ id: 'x', codePath: 'y' });
     assert.equal(p.generation, 0);
     assert.equal(p.iterationFound, 0);
     assert.equal(p.timestamp, 0);
@@ -89,7 +89,7 @@ describe('Database', () => {
   describe('save and load round-trip', () => {
     it('persists and restores state', async () => {
       const db = new Database(tmpDir);
-      const p = new Program({ code: 'hello', metrics: { score: 1.0 } });
+      const p = new Program({ codePath: 'hello', metrics: { score: 1.0 } });
       db.programs[p.id] = p;
       db.islands[0].add(p.id);
       db.bestProgramId = p.id;
@@ -98,7 +98,7 @@ describe('Database', () => {
 
       const db2 = await Database.create(tmpDir);
       assert.equal(Object.keys(db2.programs).length, 1);
-      assert.equal(db2.programs[p.id].code, 'hello');
+      assert.equal(db2.programs[p.id].codePath, 'hello');
       assert.equal(db2.bestProgramId, p.id);
       assert.equal(db2.lastIteration, 1);
       assert.ok(db2.islands[0].has(p.id));
@@ -106,7 +106,7 @@ describe('Database', () => {
 
     it('_load filters out orphaned island references', async () => {
       const db = new Database(tmpDir);
-      const p = new Program({ code: 'x' });
+      const p = new Program({ codePath: 'x' });
       db.programs[p.id] = p;
       db.islands[0].add(p.id);
       db.islands[0].add('nonexistent-id');
@@ -121,7 +121,7 @@ describe('Database', () => {
   describe('addProgram', () => {
     it('adds program and updates state', async () => {
       const db = new Database(tmpDir);
-      const p = new Program({ code: 'fn()' });
+      const p = new Program({ codePath: 'fn()' });
       await db.addProgram(p);
 
       assert.equal(db.programs[p.id], p);
@@ -135,10 +135,10 @@ describe('Database', () => {
 
     it('increments generation from parent', async () => {
       const db = new Database(tmpDir);
-      const parent = new Program({ code: 'parent' });
+      const parent = new Program({ codePath: 'parent' });
       await db.addProgram(parent);
 
-      const child = new Program({ code: 'child', parentId: parent.id });
+      const child = new Program({ codePath: 'child', parentId: parent.id });
       await db.addProgram(child);
 
       assert.equal(child.generation, 1);
@@ -146,10 +146,10 @@ describe('Database', () => {
 
     it('rotates islands on successive adds', async () => {
       const db = new Database(tmpDir);
-      const p1 = new Program({ code: 'a' });
-      const p2 = new Program({ code: 'b' });
-      const p3 = new Program({ code: 'c' });
-      const p4 = new Program({ code: 'd' });
+      const p1 = new Program({ codePath: 'a' });
+      const p2 = new Program({ codePath: 'b' });
+      const p3 = new Program({ codePath: 'c' });
+      const p4 = new Program({ codePath: 'd' });
 
       await db.addProgram(p1);
       assert.ok(db.islands[0].has(p1.id));
@@ -166,28 +166,28 @@ describe('Database', () => {
 
     it('updates bestProgramId when new program is better', async () => {
       const db = new Database(tmpDir);
-      const p1 = new Program({ code: 'a', metrics: { score: 0.5 } });
+      const p1 = new Program({ codePath: 'a', metrics: { score: 0.5 } });
       await db.addProgram(p1);
       assert.equal(db.bestProgramId, p1.id);
 
-      const p2 = new Program({ code: 'b', metrics: { score: 0.9 } });
+      const p2 = new Program({ codePath: 'b', metrics: { score: 0.9 } });
       await db.addProgram(p2);
       assert.equal(db.bestProgramId, p2.id);
     });
 
     it('does not update bestProgramId when new program is worse', async () => {
       const db = new Database(tmpDir);
-      const p1 = new Program({ code: 'a', metrics: { score: 0.9 } });
+      const p1 = new Program({ codePath: 'a', metrics: { score: 0.9 } });
       await db.addProgram(p1);
 
-      const p2 = new Program({ code: 'b', metrics: { score: 0.1 } });
+      const p2 = new Program({ codePath: 'b', metrics: { score: 0.1 } });
       await db.addProgram(p2);
       assert.equal(db.bestProgramId, p1.id);
     });
 
     it('saves to disk after adding', async () => {
       const db = new Database(tmpDir);
-      await db.addProgram(new Program({ code: 'x' }));
+      await db.addProgram(new Program({ codePath: 'x' }));
 
       const filePath = path.join(tmpDir, 'database.json');
       const stat = await fs.stat(filePath);
@@ -219,8 +219,8 @@ describe('Database', () => {
       db.numIslands = 3;
       db.migrationRate = 0.5;
 
-      const p1 = Program.fromJSON({ id: 'p1', code: 'a', metrics: { score: 0.9 }, timestamp: 1 });
-      const p2 = Program.fromJSON({ id: 'p2', code: 'b', metrics: { score: 0.5 }, timestamp: 1 });
+      const p1 = Program.fromJSON({ id: 'p1', codePath: 'a', metrics: { score: 0.9 }, timestamp: 1 });
+      const p2 = Program.fromJSON({ id: 'p2', codePath: 'b', metrics: { score: 0.5 }, timestamp: 1 });
       db.programs = { p1, p2 };
       db.islands = [new Set(['p1', 'p2']), new Set(), new Set()];
 
@@ -234,7 +234,7 @@ describe('Database', () => {
       const db = new Database(tmpDir);
       db.numIslands = 1;
       db.islands = [new Set(['x'])];
-      db.programs = { x: Program.fromJSON({ id: 'x', code: 'a', metrics: {}, timestamp: 1 }) };
+      db.programs = { x: Program.fromJSON({ id: 'x', codePath: 'a', metrics: {}, timestamp: 1 }) };
       db._migratePrograms();
       assert.equal(db.islands[0].size, 1);
     });
@@ -244,7 +244,7 @@ describe('Database', () => {
     it('does nothing when island is under max size', () => {
       const db = new Database(tmpDir);
       db.maxIslandSize = 5;
-      const p = Program.fromJSON({ id: 'p1', code: 'x', metrics: { s: 1 }, timestamp: 1 });
+      const p = Program.fromJSON({ id: 'p1', codePath: 'x', metrics: { s: 1 }, timestamp: 1 });
       db.programs = { p1: p };
       db.islands = [new Set(['p1']), new Set(), new Set()];
 
@@ -260,7 +260,7 @@ describe('Database', () => {
       for (let i = 0; i < 4; i++) {
         const p = Program.fromJSON({
           id: `p${i}`,
-          code: `code${i}`,
+          codePath: `code${i}`,
           metrics: { score: i * 0.25 },
           timestamp: i,
         });
@@ -280,8 +280,8 @@ describe('Database', () => {
       const db = new Database(tmpDir);
       db.maxIslandSize = 1;
 
-      const p1 = Program.fromJSON({ id: 'p1', code: 'a', metrics: { s: 1.0 }, timestamp: 1 });
-      const p2 = Program.fromJSON({ id: 'p2', code: 'b', metrics: { s: 0.1 }, timestamp: 1 });
+      const p1 = Program.fromJSON({ id: 'p1', codePath: 'a', metrics: { s: 1.0 }, timestamp: 1 });
+      const p2 = Program.fromJSON({ id: 'p2', codePath: 'b', metrics: { s: 0.1 }, timestamp: 1 });
       db.programs = { p1, p2 };
       db.islands = [new Set(['p1', 'p2']), new Set(['p2']), new Set()];
 
@@ -297,8 +297,8 @@ describe('Database', () => {
       const db = new Database(tmpDir);
       db.maxIslandSize = 1;
 
-      const p1 = Program.fromJSON({ id: 'p1', code: 'a', metrics: { s: 1.0 }, timestamp: 1 });
-      const p2 = Program.fromJSON({ id: 'p2', code: 'b', metrics: { s: 0.1 }, timestamp: 1 });
+      const p1 = Program.fromJSON({ id: 'p1', codePath: 'a', metrics: { s: 1.0 }, timestamp: 1 });
+      const p2 = Program.fromJSON({ id: 'p2', codePath: 'b', metrics: { s: 0.1 }, timestamp: 1 });
       db.programs = { p1, p2 };
       db.islands = [new Set(['p1', 'p2']), new Set(), new Set()];
 
@@ -319,19 +319,19 @@ describe('Database', () => {
     it('returns a parent and inspirations when programs exist', async () => {
       const db = new Database(tmpDir);
       for (let i = 0; i < 5; i++) {
-        await db.addProgram(new Program({ code: `code${i}`, metrics: { s: i } }));
+        await db.addProgram(new Program({ codePath: `code${i}`, metrics: { s: i } }));
       }
 
       db.currentIsland = 0;
       const result = db.sample();
       assert.ok(result.parent !== null);
-      assert.ok(result.parent.code !== undefined);
+      assert.ok(result.parent.codePath !== undefined);
     });
 
     it('inspirations do not include the parent', async () => {
       const db = new Database(tmpDir);
       for (let i = 0; i < 10; i++) {
-        await db.addProgram(new Program({ code: `code${i}`, metrics: { s: i } }));
+        await db.addProgram(new Program({ codePath: `code${i}`, metrics: { s: i } }));
       }
 
       db.currentIsland = 0;
@@ -351,7 +351,7 @@ describe('Database', () => {
 
     it('falls back to any program when current island is empty', async () => {
       const db = new Database(tmpDir);
-      const p = new Program({ code: 'x', metrics: { s: 1 } });
+      const p = new Program({ codePath: 'x', metrics: { s: 1 } });
       db.programs[p.id] = p;
       db.islands[1].add(p.id);
       db.currentIsland = 0;
@@ -372,7 +372,7 @@ describe('Database', () => {
       const db = new Database(tmpDir);
       db.currentIsland = 0;
       for (let i = 0; i < 20; i++) {
-        const p = Program.fromJSON({ id: `p${i}`, code: `c${i}`, metrics: { s: i }, timestamp: i });
+        const p = Program.fromJSON({ id: `p${i}`, codePath: `c${i}`, metrics: { s: i }, timestamp: i });
         db.programs[p.id] = p;
         db.islands[0].add(p.id);
       }
@@ -396,7 +396,7 @@ describe('Database', () => {
 
     it('returns the best program', async () => {
       const db = new Database(tmpDir);
-      const p = new Program({ code: 'best', metrics: { score: 1.0 } });
+      const p = new Program({ codePath: 'best', metrics: { score: 1.0 } });
       await db.addProgram(p);
       assert.equal(db.bestProgram.id, p.id);
     });
@@ -411,7 +411,7 @@ describe('migration triggered by addProgram', () => {
       db.islandGenerations = [0, 0];
 
       for (let i = 0; i < 6; i++) {
-        await db.addProgram(new Program({ code: `c${i}`, metrics: { s: i } }));
+        await db.addProgram(new Program({ codePath: `c${i}`, metrics: { s: i } }));
       }
 
       const island0Ids = [...db.islands[0]];

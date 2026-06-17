@@ -58,19 +58,21 @@ Follow the procedure in `references/context.md`:
 
 Only if the database is empty:
 
-1. Read the current implementation of the target.
-2. Evaluate it (see Step 6e) to get a baseline score.
-3. Create a Program and add it to the database:
+1. The target file is the seed candidate. Its absolute path will be stored as `codePath`.
+2. Extract the target function/method/class code from the file.
+3. Evaluate it (see Step 5e) to get a baseline score.
+4. Create a Program with the file path and the target code:
    ```javascript
    const seed = new Program({
-     code: currentImplementation,
+     codePath: absolutePathToTargetFile,  // absolute path to the file
+     targetCode: targetCodeOnly,          // just the target function/method/class
      parentId: "0",
      metrics: baselineMetrics,
      changes: "initial implementation"
    });
    await db.addProgram(seed);
    ```
-4. Report: "Baseline score: {metrics}. Starting evolution."
+5. Report: "Baseline score: {metrics}. Starting evolution."
 
 ### Step 5: Evolution Loop
 
@@ -84,36 +86,34 @@ const { parent, inspirations } = db.sample();
 
 If parent is null, report an error and stop.
 
-#### 5b. Build the Mutation Prompt
+#### 5b. Write Parent to Disk
 
-Assemble the prompt with these sections:
+Copy the parent's file to the candidate path for this iteration:
 
-**System message:**
-```
-You are an expert code optimizer. Your goal: {optimization_goal}.
-Generate an improved version of the target code that scores higher on the evaluation metric.
-It must maintain the exact same signature (name, parameters, return type).
-
-Respond with EXACTLY two sections, in this order:
-
-CHANGES: <one-line summary of what you changed and why>
-CODE:
-<the replacement code for the target function/method/class — no markdown fences, no explanation>
+```bash
+cp <parent.codePath> evolve-output/candidates/iteration_<N>.<ext>
 ```
 
-**User message — assemble in order:**
+This gives the subagent a real file to edit in place.
 
-1. **Context** (from the extracted context file):
+#### 5c. Dispatch Subagent to Mutate
+
+Spawn a subagent (Claude Code or Codex) with the following prompt. The subagent operates on the candidate file written in 5b and edits it directly using its tools.
+
+**Subagent prompt — assemble in order:**
+
+1. **Task:**
+   ```
+   You are an expert code optimizer. Your goal: {optimization_goal}.
+   Modify the function/method/class `{target_name}` in the file `evolve-output/candidates/iteration_<N>.<ext>` to improve its efficiency.
+   Edit the file in place. Do not change the signature (name, parameters, return type).
+   Do not modify anything outside the target.
+   ```
+
+2. **Context** (from the extracted context file):
    - Goal description
    - Imports
    - Dependency signatures
-
-2. **Parent code:**
-   ```
-   # Current Implementation (to improve)
-
-   {parent.code}
-   ```
 
 3. **Evaluation history** (from inspirations):
    ```
@@ -133,26 +133,23 @@ CODE:
    - Iterations 7–9: "Try a fundamentally different approach to the problem."
    - Iterations 10+: "Combine the best ideas from previous attempts into a single superior solution."
 
-5. **Constraints reminder:**
+5. **Constraints:**
    ```
    CONSTRAINTS:
    - Same function/method/class signature — do not rename or change parameters.
    - Must remain correct — do not sacrifice correctness for performance.
-   - Output ONLY the replacement code, nothing else.
+   - Edit the file in place. Only modify the target `{target_name}`.
+   - After editing, respond with a one-line CHANGES summary of what you did and why.
    ```
 
-#### 5c. Generate Variant
+The subagent edits `evolve-output/candidates/iteration_<N>.<ext>` using its coding tools (Read, Edit, Write) and returns a one-line `changes` summary.
 
-Send the prompt to a subagent. Parse the response into two parts:
-- **changes**: the text after `CHANGES:` (one-line summary)
-- **code**: everything after `CODE:` (the candidate implementation)
+#### 5d. Read the Mutated Candidate
 
-If the response contains markdown fences, strip them from the code portion.
-
-#### 5d. Write Candidate to Disk
-
-1. Copy the target file to `evolve-output/candidates/iteration_<N>.<ext>`.
-2. In the copy, replace the target function/method/class with the generated variant.
+After the subagent finishes:
+1. The candidate file is at `evolve-output/candidates/iteration_<N>.<ext>` (absolute path). This is the `codePath` for the new Program.
+2. Extract the target function/method/class from the candidate file — this is the `targetCode`.
+3. Capture the `changes` summary from the subagent's response.
 
 #### 5e. Evaluate the Candidate
 
@@ -182,13 +179,14 @@ Store individual scores in metrics: `{ "efficiency": llm_score, "benchmark": cmd
 #### 5f. Update Population
 
 If final_score is not `-Infinity`:
-1. Create and add the program (using the `changes` parsed from the LLM response in 5c):
+1. Create and add the program (codePath is the absolute path to the candidate file from 5d, targetCode and changes come from 5d):
    ```javascript
    const candidate = new Program({
-     code: candidateCode,
+     codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<N>.<ext>
+     targetCode: targetCodeOnly,             // just the modified target function/method/class
      parentId: parent.id,
      metrics: { efficiency: llmScore, benchmark: cmdScore },
-     changes: changesFromLLM
+     changes: changesFromSubagent
    });
    await db.addProgram(candidate);
    ```
@@ -209,7 +207,7 @@ Iteration <N>/<total> | efficiency: <llm_score> | benchmark: <cmd_score or n/a> 
 After all iterations complete:
 
 1. Retrieve `db.bestProgram`.
-2. Write the best code to `evolve-output/best/<target_file_name>`.
+2. Copy the best candidate file to the output: `cp <db.bestProgram.codePath> evolve-output/best/<target_file_name>`.
 3. Report to the user:
    ```
    Evolution complete.
@@ -219,9 +217,9 @@ After all iterations complete:
 
    Strategy that worked best: <summarize from changes field>
    ```
-4. Show the best implementation code.
+4. Show the best implementation's target code (`db.bestProgram.targetCode`).
 5. **Ask the user**: "Apply this implementation to the original source file?"
-   - If yes: replace the target in the original file with the best code.
+   - If yes: `cp <db.bestProgram.codePath> <original target file>`.
    - If no: leave the original unchanged. The result is saved in `evolve-output/best/`.
 
 ## Error Handling
