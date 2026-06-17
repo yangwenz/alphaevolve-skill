@@ -92,9 +92,13 @@ Assemble the prompt with these sections:
 ```
 You are an expert code optimizer. Your goal: {optimization_goal}.
 Generate an improved version of the target code that scores higher on the evaluation metric.
-Output ONLY the replacement code for the target function/method/class.
-No explanation, no markdown fences, no surrounding code — just the target body.
 It must maintain the exact same signature (name, parameters, return type).
+
+Respond with EXACTLY two sections, in this order:
+
+CHANGES: <one-line summary of what you changed and why>
+CODE:
+<the replacement code for the target function/method/class — no markdown fences, no explanation>
 ```
 
 **User message — assemble in order:**
@@ -139,9 +143,11 @@ It must maintain the exact same signature (name, parameters, return type).
 
 #### 5c. Generate Variant
 
-Send the prompt to the LLM. The response is the candidate code.
+Send the prompt to a subagent. Parse the response into two parts:
+- **changes**: the text after `CHANGES:` (one-line summary)
+- **code**: everything after `CODE:` (the candidate implementation)
 
-If the response contains markdown fences or explanation text, strip them — extract only the code.
+If the response contains markdown fences, strip them from the code portion.
 
 #### 5d. Write Candidate to Disk
 
@@ -176,14 +182,13 @@ Store individual scores in metrics: `{ "efficiency": llm_score, "benchmark": cmd
 #### 5f. Update Population
 
 If final_score is not `-Infinity`:
-1. Generate a one-line diff summary describing what changed from parent to candidate.
-2. Create and add the program:
+1. Create and add the program (using the `changes` parsed from the LLM response in 5c):
    ```javascript
    const candidate = new Program({
      code: candidateCode,
      parentId: parent.id,
      metrics: { efficiency: llmScore, benchmark: cmdScore },
-     changes: "one-line summary of what changed"
+     changes: changesFromLLM
    });
    await db.addProgram(candidate);
    ```
