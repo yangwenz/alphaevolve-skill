@@ -182,8 +182,8 @@ After the subagent finishes:
 1. Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
 2. Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
 3. Execute the eval_command (no `$FILE` substitution — it runs against the code at its original path).
-4. Parse JSON output for numeric scores.
-5. If the command exits non-zero or output is unparseable, report an error to the user and stop.
+4. Extract `cmd_score` from the command's stdout: try parsing as JSON first, otherwise treat as plain text. In either case, infer which numeric value represents the score.
+5. If the command exits non-zero or no numeric value can be extracted from the output, report an error to the user and stop.
 6. Validate the score is in [0.0, 1.0]. If the score is greater than 1.0 or less than 0.0, report an error to the user and stop.
 7. Restore the original: `mv <original_target_file>.bak <original_target_file>`
 
@@ -195,20 +195,17 @@ Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark
 
 #### 5f. Update Population
 
-If final_score is not `-Infinity`:
-1. Create and add the program (codePath is the absolute path to the candidate file from 5d, targetCode and changes come from 5d):
-   ```javascript
-   const candidate = new Program({
-     codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<N>.<ext>
-     targetCode: targetCodeOnly,             // just the modified target function/method/class
-     parentId: parent.id,
-     metrics: metrics,                       // { "efficiency-score": llmScore, "benchmark-score": cmdScore } — omit "benchmark-score" if no eval_command
-     changes: changesFromSubagent
-   });
-   await db.addProgram(candidate);
-   ```
-
-If final_score is `-Infinity`: do not add to population.
+Create and add the program (codePath is the absolute path to the candidate file from 5d, targetCode and changes come from 5d):
+```javascript
+const candidate = new Program({
+  codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<N>.<ext>
+  targetCode: targetCodeOnly,             // just the modified target function/method/class
+  parentId: parent.id,
+  metrics: metrics,                       // { "efficiency-score": llmScore, "benchmark-score": cmdScore } — omit "benchmark-score" if no eval_command
+  changes: changesFromSubagent
+});
+await db.addProgram(candidate);
+```
 
 #### 5g. Report Progress
 
