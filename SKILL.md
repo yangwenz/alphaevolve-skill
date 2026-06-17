@@ -8,9 +8,11 @@ description: |
 argument-hint: <target_file> <target_name> [line:<N> or signature] [iterations] [goal] [eval_command]
 ---
 
-# AlphaEvolve — Evolutionary Code Optimization Loop
+# Evolutionary Code Optimization Loop
 
 Evolve a target function/method/class through iterative mutation and selection, using an island-model population database to maintain diversity and avoid local optima.
+
+If `goal` is not provided, default to: "optimize code efficiency — make the code faster and with less anti-patterns."
 
 ## Workflow
 
