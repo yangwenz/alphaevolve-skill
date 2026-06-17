@@ -28,11 +28,14 @@ function avgMetrics(program) {
   return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
 
+function comparePrograms(a, b) {
+  const diff = avgMetrics(b) - avgMetrics(a);
+  if (diff !== 0) return diff;
+  return b.timestamp - a.timestamp;
+}
+
 function isBetter(program1, program2) {
-  const score1 = avgMetrics(program1);
-  const score2 = avgMetrics(program2);
-  if (score1 !== score2) return score1 > score2;
-  return program1.timestamp > program2.timestamp;
+  return comparePrograms(program1, program2) < 0;
 }
 
 export class Database {
@@ -149,7 +152,7 @@ export class Database {
       const islandProgramIds = [...this.islands[i]].filter((id) => Object.hasOwn(this.programs, id));
       if (islandProgramIds.length === 0) continue;
 
-      islandProgramIds.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+      islandProgramIds.sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
       const numToMigrate = Math.max(1, Math.floor(islandProgramIds.length * this.migrationRate));
       const migrants = islandProgramIds.slice(0, numToMigrate);
       const targets = [(i + 1) % this.numIslands, (i - 1 + this.numIslands) % this.numIslands];
@@ -170,7 +173,7 @@ export class Database {
     if (island.size <= this.maxIslandSize) return;
 
     const ids = [...island].filter((id) => Object.hasOwn(this.programs, id));
-    ids.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+    ids.sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
     const toRemove = ids.slice(this.maxIslandSize);
     for (const id of toRemove) {
       island.delete(id);
@@ -195,7 +198,7 @@ export class Database {
     if (Math.random() < this.explorationRatio) {
       return this.programs[islandIds[Math.floor(Math.random() * islandIds.length)]];
     }
-    const sorted = islandIds.slice().sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
+    const sorted = islandIds.slice().sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
     const k = Math.min(3, sorted.length);
     return this.programs[sorted[Math.floor(Math.random() * k)]];
   }
