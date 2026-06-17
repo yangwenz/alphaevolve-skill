@@ -106,7 +106,7 @@ async function main() {
     case 'best': {
       const best = db.bestProgram;
       if (!best) {
-        console.log(JSON.stringify({ best: null }));
+        console.log(JSON.stringify(null));
       } else {
         console.log(JSON.stringify({
           id: best.id,
