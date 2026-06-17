@@ -5,7 +5,6 @@ export class Program {
   constructor({
     id,
     code,
-    language = 'python',
     parentId = null,
     generation = 0,
     iterationFound = 0,
@@ -14,7 +13,6 @@ export class Program {
   }) {
     this.id = id;
     this.code = code;
-    this.language = language;
     this.parentId = parentId;
     this.generation = generation;
     this.iterationFound = iterationFound;
