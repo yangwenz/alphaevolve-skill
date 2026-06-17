@@ -5,7 +5,6 @@ description: |
   "run alphaevolve", "evolve this code", or wants to iteratively improve code performance
   against a measurable metric. Wraps coding agent as a mutation engine inside an evolutionary loop
   with population-based search, automated evaluation, and iterative refinement.
-argument-hint: <target_file> <target_name> [line:<N> or signature] [iterations] [goal] [eval_command]
 ---
 
 # Evolutionary Code Optimization Loop
@@ -18,6 +17,8 @@ If `goal` is not provided, default to: "optimize code efficiency — make the co
 
 ### Step 0: Validate Inputs
 
+Infer the following from the user's request: target file, target name, disambiguator, number of iterations, optimization goal, and eval command. If any required input (target file or target name) cannot be inferred, **ask the user** before proceeding.
+
 1. Verify the target file exists. If not, report the error and stop.
 2. Read the target file and locate the target by name.
 3. If multiple definitions match the target name:
@@ -27,10 +28,13 @@ If `goal` is not provided, default to: "optimize code efficiency — make the co
 
 ### Step 1: Setup Output Directory
 
-If `evolve-output/` already exists, remove it first, then create the directory structure:
+If `evolve-output/` already exists, check the existing database to determine whether it targets the same file and function:
+- **Same target** (file path and target name match): keep the directory intact (resume mode).
+- **Different target**: remove it and start fresh: `rm -rf evolve-output/`
+
+Then ensure the directory structure exists:
 
 ```bash
-rm -rf evolve-output/
 mkdir -p evolve-output/database evolve-output/context evolve-output/candidates evolve-output/best
 ```
 
@@ -170,7 +174,7 @@ After the subagent finishes:
 
 **Step 2 — LLM-as-judge evaluator** (using the system prompt from `references/evaluator.md`):
 1. Use the `targetCode` extracted in 5d (just the target function/method/class, not the full file).
-2. Send it to the LLM with the system prompt from `references/evaluator.md`.
+2. Spawn a subagent with the contents of `references/evaluator.md` as its system prompt. Pass the `targetCode` as the user message.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`.
 4. Compute: `llm_score = efficiency_score / 10.0`.
 
@@ -185,7 +189,7 @@ After the subagent finishes:
 
 **Final score:**
 - LLM evaluator only: `final_score = llm_score`
-- Both evaluators: `final_score = (llm_score + normalize(cmd_score)) / 2`
+- Both evaluators: `final_score = (llm_score + cmd_score) / 2`
 
 Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark-score": cmd_score }` (omit `"benchmark-score"` key if no eval_command).
 
@@ -212,7 +216,6 @@ After each iteration, print:
 ```
 Iteration <N>/<total> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <db.bestProgram.metrics>
   Δ <change summary>
-  → <accepted | rejected (tests failed) | rejected (below threshold)>
 ```
 
 ### Step 6: Finalize
