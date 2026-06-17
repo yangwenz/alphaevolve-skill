@@ -67,6 +67,7 @@ export class Database {
       numIslands: this.numIslands,
       migrationInterval: this.migrationInterval,
       migrationRate: this.migrationRate,
+      explorationRatio: this.explorationRatio,
       programs: Object.fromEntries(
         Object.entries(this.programs).map(([id, p]) => [id, { ...p }])
       ),
@@ -99,6 +100,7 @@ export class Database {
     this.numIslands = data.numIslands;
     this.migrationInterval = data.migrationInterval;
     this.migrationRate = data.migrationRate;
+    this.explorationRatio = data.explorationRatio ?? this.explorationRatio;
     this.programs = Object.fromEntries(
       Object.entries(data.programs).map(([id, p]) => [id, new Program(p)])
     );
@@ -118,7 +120,7 @@ export class Database {
 
     this.islands[this.currentIsland].add(program.id);
 
-    if (!this.bestProgramId || !(this.bestProgramId in this.programs) || isBetter(program, this.programs[this.bestProgramId])) {
+    if (!this.bestProgramId || !Object.hasOwn(this.programs, this.bestProgramId) || isBetter(program, this.programs[this.bestProgramId])) {
       this.bestProgramId = program.id;
     }
     this.islandGenerations[this.currentIsland]++;
@@ -140,7 +142,7 @@ export class Database {
     if (this.numIslands < 2) return;
 
     for (let i = 0; i < this.numIslands; i++) {
-      const islandProgramIds = [...this.islands[i]].filter((id) => id in this.programs);
+      const islandProgramIds = [...this.islands[i]].filter((id) => Object.hasOwn(this.programs, id));
       if (islandProgramIds.length === 0) continue;
 
       islandProgramIds.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
@@ -162,7 +164,7 @@ export class Database {
 
   sampleParent() {
     const islandIds = [...this.islands[this.currentIsland]].filter(
-      (id) => id in this.programs
+      (id) => Object.hasOwn(this.programs, id)
     );
     if (islandIds.length === 0) {
       const initial = Object.values(this.programs).find((p) => p.iterationFound === 0);
@@ -173,21 +175,8 @@ export class Database {
     }
 
     if (Math.random() < this.explorationRatio) {
-      const programs = islandIds.map((id) => this.programs[id]);
-      const scores = programs.map((p) => avgMetrics(p));
-      const maxScore = Math.max(...scores);
-      const temperature = 1.0;
-      const weights = scores.map((s) => Math.exp((s - maxScore) / temperature));
-      const totalWeight = weights.reduce((a, b) => a + b, 0);
-
-      let r = Math.random() * totalWeight;
-      for (let i = 0; i < programs.length; i++) {
-        r -= weights[i];
-        if (r <= 0) return programs[i];
-      }
-      return programs[programs.length - 1];
+      return this.programs[islandIds[Math.floor(Math.random() * islandIds.length)]];
     }
-
     const programs = islandIds.map((id) => this.programs[id]);
     return programs.reduce((best, p) => isBetter(p, best) ? p : best);
   }
