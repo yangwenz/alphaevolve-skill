@@ -183,7 +183,7 @@ After the subagent finishes:
 - LLM evaluator only: `final_score = llm_score`
 - Both evaluators: `final_score = (llm_score + normalize(cmd_score)) / 2`
 
-Store individual scores in metrics: `{ "efficiency": llm_score, "benchmark": cmd_score }` (omit benchmark key if no eval_command).
+Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark-score": cmd_score }` (omit `"benchmark-score"` key if no eval_command).
 
 #### 5f. Update Population
 
@@ -194,7 +194,7 @@ If final_score is not `-Infinity`:
      codePath: absolutePathToCandidateFile,  // absolute path to evolve-output/candidates/iteration_<N>.<ext>
      targetCode: targetCodeOnly,             // just the modified target function/method/class
      parentId: parent.id,
-     metrics: { efficiency: llmScore, benchmark: cmdScore },
+     metrics: metrics,                       // { "efficiency-score": llmScore, "benchmark-score": cmdScore } — omit "benchmark-score" if no eval_command
      changes: changesFromSubagent
    });
    await db.addProgram(candidate);
@@ -206,8 +206,8 @@ If final_score is `-Infinity`: do not add to population.
 
 After each iteration, print:
 ```
-Iteration <N>/<total> | efficiency: <llm_score> | benchmark: <cmd_score or n/a> | best: <db.bestProgram.metrics>
-  Δ <one-line change summary>
+Iteration <N>/<total> | efficiency-score: <llm_score> | benchmark-score: <cmd_score or n/a> | best: <db.bestProgram.metrics>
+  Δ <change summary>
   → <accepted | rejected (tests failed) | rejected (below threshold)>
 ```
 
@@ -245,14 +245,3 @@ If `evolve-output/database/database.json` exists with programs:
 - Skip seeding.
 - Start from iteration `db.lastIteration + 1`.
 - Report current best before continuing.
-
-## Configuration Defaults
-
-| Parameter | Default |
-|-----------|---------|
-| Iterations | 10 |
-| Islands | 3 |
-| Max island size | 40 |
-| Migration interval | 10 |
-| Migration rate | 0.1 |
-| Exploration ratio | 0.3 |
