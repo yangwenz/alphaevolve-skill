@@ -148,8 +148,10 @@ export class Database {
   migratePrograms() {
     if (this.numIslands < 2) return;
 
+    const snapshots = this.islands.map((s) => [...s].filter((id) => Object.hasOwn(this.programs, id)));
+    
     for (let i = 0; i < this.numIslands; i++) {
-      const islandProgramIds = [...this.islands[i]].filter((id) => Object.hasOwn(this.programs, id));
+      const islandProgramIds = snapshots[i];
       if (islandProgramIds.length === 0) continue;
 
       islandProgramIds.sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
