@@ -156,7 +156,7 @@ After the subagent finishes:
 #### 5e. Evaluate the Candidate
 
 **Always run the LLM-as-judge evaluator** using the system prompt from `references/evaluator.md`:
-1. Read the candidate code from the file written in 5d.
+1. Use the `targetCode` extracted in 5d (just the target function/method/class, not the full file).
 2. Send it to the LLM with the system prompt from `references/evaluator.md`.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`.
 4. Compute: `llm_score = efficiency_score / 10.0`.
