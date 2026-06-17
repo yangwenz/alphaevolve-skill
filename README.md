@@ -7,7 +7,7 @@ An [AlphaEvolve](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powe
 The optimizer wraps coding agent capabilities in a population-based search loop:
 
 ```
-Seed → Sample → Mutate → Evaluate → Select → Migrate → (repeat)
+Seed → [ Sample → Mutate → Evaluate → Select → Migrate ] × N
 ```
 
 | Step | Description |
