@@ -29,23 +29,6 @@ export class Program {
   }
 }
 
-function avgMetrics(program) {
-  const vals = Object.values(program.metrics).filter(
-    (v) => typeof v === 'number' && !Number.isNaN(v)
-  );
-  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-}
-
-function comparePrograms(a, b) {
-  const diff = avgMetrics(b) - avgMetrics(a);
-  if (diff !== 0) return diff;
-  return b.timestamp - a.timestamp;
-}
-
-function isBetter(program1, program2) {
-  return comparePrograms(program1, program2) < 0;
-}
-
 export class Database {
   constructor(savePath) {
     this.numIslands = 3;
@@ -228,12 +211,12 @@ export class Database {
 
     const sorted = islandIds.slice().sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
     const topK = sorted.slice(0, Math.min(5, sorted.length));
-    const shuffledTop = topK.sort(() => Math.random() - 0.5);
+    const shuffledTop = shuffle(topK);
     const elites = shuffledTop.slice(0, Math.min(3, shuffledTop.length));
 
     const eliteSet = new Set(elites);
     const rest = islandIds.filter((id) => !eliteSet.has(id));
-    const shuffledRest = rest.sort(() => Math.random() - 0.5);
+    const shuffledRest = shuffle(rest);
     const exploratory = shuffledRest.slice(0, Math.min(2, shuffledRest.length));
 
     return [...elites, ...exploratory].map((id) => this.programs[id]);
@@ -246,4 +229,29 @@ export class Database {
   get bestProgram() {
     return this.bestProgramId ? this.programs[this.bestProgramId] ?? null : null;
   }
+}
+
+function avgMetrics(program) {
+  const vals = Object.values(program.metrics).filter(
+    (v) => typeof v === 'number' && !Number.isNaN(v)
+  );
+  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function comparePrograms(a, b) {
+  const diff = avgMetrics(b) - avgMetrics(a);
+  if (diff !== 0) return diff;
+  return b.timestamp - a.timestamp;
+}
+
+function isBetter(program1, program2) {
+  return comparePrograms(program1, program2) < 0;
 }
