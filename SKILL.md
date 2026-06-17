@@ -155,22 +155,29 @@ After the subagent finishes:
 
 #### 5e. Evaluate the Candidate
 
-**Always run the LLM-as-judge evaluator** using the system prompt from `references/evaluator.md`:
+**Step 1 — Correctness gate (run first, always attempt):**
+- Detect the project's test runner (check `package.json` scripts, `Makefile`, or common patterns).
+- Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
+- Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
+- Run tests.
+- Restore the original: `mv <original_target_file>.bak <original_target_file>`
+- If tests fail: **discard this candidate and continue to the next iteration** (skip the remaining evaluation steps).
+- If no test runner is detected, skip this gate and note it in the output.
+
+**Step 2 — LLM-as-judge evaluator** (using the system prompt from `references/evaluator.md`):
 1. Use the `targetCode` extracted in 5d (just the target function/method/class, not the full file).
 2. Send it to the LLM with the system prompt from `references/evaluator.md`.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`.
 4. Compute: `llm_score = efficiency_score / 10.0`.
 
-**If an eval_command was provided**, also run it:
-1. Execute: the eval_command with `$FILE` replaced by the candidate file path.
-2. Parse JSON output for numeric scores.
-3. If the command exits non-zero or output is unparseable: `cmd_score = -Infinity`.
-
-**Correctness gate** (always attempt):
-- Detect the project's test runner (check `package.json` scripts, `Makefile`, or common patterns).
-- Run tests with the candidate in place.
-- If tests fail: final score = `-Infinity` (reject candidate).
-- If no test runner is detected, skip this gate and note it in the output.
+**Step 3 — Shell command evaluator** (only if an eval_command was provided):
+1. Back up the original target file: `cp <original_target_file> <original_target_file>.bak`
+2. Copy the candidate to the original location: `cp <candidate_file> <original_target_file>`
+3. Execute the eval_command (no `$FILE` substitution — it runs against the code at its original path).
+4. Parse JSON output for numeric scores.
+5. If the command exits non-zero or output is unparseable, report an error to the user and stop.
+6. Validate the score is in [0.0, 1.0]. If the score is greater than 1.0 or less than 0.0, report an error to the user and stop.
+7. Restore the original: `mv <original_target_file>.bak <original_target_file>`
 
 **Final score:**
 - LLM evaluator only: `final_score = llm_score`
