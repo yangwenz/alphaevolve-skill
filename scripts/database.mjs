@@ -146,10 +146,8 @@ export class Database {
       if (islandProgramIds.length === 0) continue;
 
       islandProgramIds.sort((a, b) => avgMetrics(this.programs[b]) - avgMetrics(this.programs[a]));
-
       const numToMigrate = Math.max(1, Math.floor(islandProgramIds.length * this.migrationRate));
       const migrants = islandProgramIds.slice(0, numToMigrate);
-
       const targets = [(i + 1) % this.numIslands, (i - 1 + this.numIslands) % this.numIslands];
 
       for (const migrantId of migrants) {
@@ -158,7 +156,6 @@ export class Database {
         }
       }
     }
-
     this.lastMigrationGeneration = Math.max(...this.islandGenerations);
   }
 
