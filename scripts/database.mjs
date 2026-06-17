@@ -5,18 +5,15 @@ export class Program {
   constructor({
     id,
     code,
-    parentId = null,
-    generation = 0,
-    iterationFound = 0,
-    timestamp = Date.now() / 1000,
+    parentId = "0",
     metrics = {},
   }) {
     this.id = id;
     this.code = code;
     this.parentId = parentId;
-    this.generation = generation;
-    this.iterationFound = iterationFound;
-    this.timestamp = timestamp;
+    this.generation = 0;
+    this.iterationFound = 0;
+    this.timestamp = Date.now() / 1000;
     this.metrics = metrics;
   }
 }
@@ -120,6 +117,7 @@ export class Database {
 
   async addProgram(program) {
     program.iterationFound = this.lastIteration;
+    program.timestamp = Date.now() / 1000
     this.programs[program.id] = program;
 
     this.islands[this.currentIsland].add(program.id);
@@ -149,7 +147,7 @@ export class Database {
     if (this.numIslands < 2) return;
 
     const snapshots = this.islands.map((s) => [...s].filter((id) => Object.hasOwn(this.programs, id)));
-    
+
     for (let i = 0; i < this.numIslands; i++) {
       const islandProgramIds = snapshots[i];
       if (islandProgramIds.length === 0) continue;
