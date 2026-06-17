@@ -66,11 +66,11 @@ export class Database {
 
   static async create(savePath) {
     const db = new Database(savePath);
-    await db.load();
+    await db._load();
     return db;
   }
 
-  async save() {
+  async _save() {
     await fs.mkdir(this.savePath, { recursive: true });
 
     const data = {
@@ -96,7 +96,7 @@ export class Database {
     );
   }
 
-  async load() {
+  async _load() {
     const filePath = path.join(this.savePath, 'database.json');
 
     let raw;
@@ -139,21 +139,21 @@ export class Database {
     this.lastIteration++;
     this.currentIsland = (this.currentIsland + 1) % this.numIslands;
 
-    if (this.shouldMigrate()) {
-      this.migratePrograms();
+    if (this._shouldMigrate()) {
+      this._migratePrograms();
     }
     for (let i = 0; i < this.numIslands; i++) {
-      this.pruneIsland(i);
+      this._pruneIsland(i);
     }
-    await this.save();
+    await this._save();
   }
 
-  shouldMigrate() {
+  _shouldMigrate() {
     const maxGen = Math.max(...this.islandGenerations);
     return (maxGen - this.lastMigrationGeneration) >= this.migrationInterval;
   }
 
-  migratePrograms() {
+  _migratePrograms() {
     if (this.numIslands < 2) return;
 
     const snapshots = this.islands.map((s) => [...s].filter((id) => Object.hasOwn(this.programs, id)));
@@ -178,7 +178,7 @@ export class Database {
     this.lastMigrationGeneration = Math.max(...this.islandGenerations);
   }
 
-  pruneIsland(islandIndex) {
+  _pruneIsland(islandIndex) {
     const island = this.islands[islandIndex];
     if (island.size <= this.maxIslandSize) return;
 
@@ -193,26 +193,14 @@ export class Database {
     }
   }
 
-  sampleInspirations() {
-    const islandIds = [...this.islands[this.currentIsland]].filter(
-      (id) => Object.hasOwn(this.programs, id)
-    );
-    if (islandIds.length === 0) return [];
-
-    const sorted = islandIds.slice().sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
-    const topK = sorted.slice(0, Math.min(5, sorted.length));
-    const shuffledTop = topK.sort(() => Math.random() - 0.5);
-    const elites = shuffledTop.slice(0, Math.min(3, shuffledTop.length));
-
-    const eliteSet = new Set(elites);
-    const rest = islandIds.filter((id) => !eliteSet.has(id));
-    const shuffledRest = rest.sort(() => Math.random() - 0.5);
-    const exploratory = shuffledRest.slice(0, Math.min(2, shuffledRest.length));
-
-    return [...elites, ...exploratory].map((id) => this.programs[id]);
+  sample() {
+    const parent = this._sampleParent();
+    if (!parent) return { parent: null, inspirations: [] };
+    const inspirations = this._sampleInspirations().filter((p) => p.id !== parent.id);
+    return { parent, inspirations };
   }
 
-  sampleParent() {
+  _sampleParent() {
     const islandIds = [...this.islands[this.currentIsland]].filter(
       (id) => Object.hasOwn(this.programs, id)
     );
@@ -232,7 +220,26 @@ export class Database {
     return this.programs[sorted[Math.floor(Math.random() * k)]];
   }
 
-  getProgram(id) {
+  _sampleInspirations() {
+    const islandIds = [...this.islands[this.currentIsland]].filter(
+      (id) => Object.hasOwn(this.programs, id)
+    );
+    if (islandIds.length === 0) return [];
+
+    const sorted = islandIds.slice().sort((a, b) => comparePrograms(this.programs[a], this.programs[b]));
+    const topK = sorted.slice(0, Math.min(5, sorted.length));
+    const shuffledTop = topK.sort(() => Math.random() - 0.5);
+    const elites = shuffledTop.slice(0, Math.min(3, shuffledTop.length));
+
+    const eliteSet = new Set(elites);
+    const rest = islandIds.filter((id) => !eliteSet.has(id));
+    const shuffledRest = rest.sort(() => Math.random() - 0.5);
+    const exploratory = shuffledRest.slice(0, Math.min(2, shuffledRest.length));
+
+    return [...elites, ...exploratory].map((id) => this.programs[id]);
+  }
+
+  _getProgram(id) {
     return this.programs[id] ?? null;
   }
 
