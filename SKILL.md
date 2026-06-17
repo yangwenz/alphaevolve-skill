@@ -28,6 +28,8 @@ Infer the following from the user's request: target file, target name, disambigu
 
 ### Step 1: Setup Output Directory & Load Database
 
+All paths prefixed with `scripts/` or `references/` are relative to the skill's installation directory (the directory containing this `SKILL.md` file). Resolve this directory first and use absolute paths when invoking these files (e.g., `node /absolute/path/to/scripts/db-cli.mjs`).
+
 Ensure the directory structure exists:
 
 ```bash
@@ -37,7 +39,7 @@ mkdir -p evolve-output/database evolve-output/context evolve-output/candidates e
 All database interactions use the CLI wrapper at `scripts/db-cli.mjs`. Load/create the database and check its status:
 
 ```bash
-node scripts/db-cli.mjs info evolve-output/database
+node <skill_dir>/scripts/db-cli.mjs info evolve-output/database
 ```
 
 This outputs JSON: `{ "isEmpty": bool, "lastIteration": int, "programCount": int, "bestMetrics": object|null, "seedCodePath": string|null, "seedTargetCode": string|null }`.
@@ -48,7 +50,7 @@ If `isEmpty` is false, **ask the user**: "An existing evolution run was found ({
 
 ### Step 2: Extract Context
 
-Follow the procedure in `references/context.md`:
+Follow the procedure in `<skill_dir>/references/context.md`:
 
 1. Read the target file.
 2. Locate the target (using disambiguator if needed).
@@ -67,7 +69,7 @@ Only if the database is empty (`isEmpty` is true from the `info` command):
 3. Evaluate it using the full evaluation procedure in Step 4e (correctness gate + LLM evaluator + optional command evaluator) to get a baseline score. If the evaluation fails on the seed, report the error and stop — the evaluation setup is misconfigured.
 4. Add the seed program:
    ```bash
-   node scripts/db-cli.mjs seed evolve-output/database \
+   node <skill_dir>/scripts/db-cli.mjs seed evolve-output/database \
      --codePath "/absolute/path/to/target/file.ext" \
      --targetCode "extracted target code" \
      --metrics '{"efficiency-score": 0.7}'
@@ -82,7 +84,7 @@ Repeat for each iteration `i` from 1 to N (default N=10). The loop counter `i` a
 #### 4a. Sample Parent and Inspirations
 
 ```bash
-node scripts/db-cli.mjs sample evolve-output/database
+node <skill_dir>/scripts/db-cli.mjs sample evolve-output/database
 ```
 
 This outputs JSON: `{ "parent": { "id", "codePath", "targetCode", "metrics", "changes" }, "inspirations": [...] }`.
@@ -147,6 +149,8 @@ Spawn a subagent with the following prompt. The subagent operates on the candida
 
 The subagent edits `evolve-output/candidates/iteration_<i>.<ext>` using its coding tools (Read, Edit, Write) and returns a `changes` summary.
 
+If the subagent fails (errors out, times out, or leaves the file unchanged from the parent), retry the subagent once with the same prompt. If it fails again, discard this iteration and continue to the next.
+
 #### 4d. Read the Mutated Candidate
 
 After the subagent finishes:
@@ -168,9 +172,9 @@ After the subagent finishes:
 - If tests fail: **discard this candidate and continue to the next iteration** (skip the remaining evaluation steps).
 - If no test runner is detected, skip this gate and note it in the output.
 
-**Step 2 — LLM-as-judge evaluator** (using `references/evaluator.md`):
+**Step 2 — LLM-as-judge evaluator** (using `<skill_dir>/references/evaluator.md`):
 1. Use the `targetCode` extracted in 4d (just the target function/method/class, not the full file).
-2. Spawn a subagent whose prompt begins with the full contents of `references/evaluator.md`, followed by a separator line (`---`), followed by the `targetCode`.
+2. Spawn a subagent whose prompt begins with the full contents of `<skill_dir>/references/evaluator.md`, followed by a separator line (`---`), followed by the `targetCode`.
 3. Parse the JSON response: `{"efficiency-score": <1-10>}`. If parsing fails (invalid JSON, missing key, or score outside 1–10), retry the subagent once. If it fails again, discard this candidate and continue to the next iteration.
 4. Compute: `llm_score = efficiency_score / 10.0`.
 
@@ -197,7 +201,7 @@ Store individual scores in metrics: `{ "efficiency-score": llm_score, "benchmark
 Add the candidate to the database (codePath is the absolute path to the candidate file from 4d, targetCode and changes come from 4d):
 
 ```bash
-node scripts/db-cli.mjs add evolve-output/database \
+node <skill_dir>/scripts/db-cli.mjs add evolve-output/database \
   --codePath "/absolute/path/to/evolve-output/candidates/iteration_<i>.<ext>" \
   --targetCode "$(cat /tmp/target_code.txt)" \
   --parentId "<parent.id from 4a>" \
@@ -223,7 +227,7 @@ After all iterations complete:
 
 1. Retrieve the best program:
    ```bash
-   node scripts/db-cli.mjs best evolve-output/database
+   node <skill_dir>/scripts/db-cli.mjs best evolve-output/database
    ```
    This outputs JSON: `{ "id", "codePath", "targetCode", "metrics", "changes", "iterationFound" }`.
 
@@ -254,5 +258,7 @@ After all iterations complete:
 
 When the user chooses "Resume" in Step 1:
 - Skip seeding (Step 3).
-- The loop counter `i` starts from `lastIteration + 1` and runs for N additional iterations (so `i` goes from `lastIteration + 1` to `lastIteration + N`).
+- **Ask the user**: "Run N more iterations on top of existing progress, or complete up to iteration N total?"
+  - **N more**: the loop runs from `lastIteration + 1` to `lastIteration + N`.
+  - **Up to N total**: the loop runs from `lastIteration + 1` to `N`. If `lastIteration >= N`, report "Already at or past iteration N" and stop.
 - Report current best before continuing.
