@@ -7,6 +7,7 @@ export class Program {
     code,
     parentId = "0",
     metrics = {},
+    changes = ""
   }) {
     this.id = String(randomUUID());
     this.code = code;
@@ -15,6 +16,7 @@ export class Program {
     this.iterationFound = 0;
     this.timestamp = Date.now() / 1000;
     this.metrics = metrics;
+    this.changes = changes;
   }
 
   static fromJSON(data) {
