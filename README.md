@@ -101,3 +101,7 @@ evolve-output/
 ```
 
 Runs are **resumable** — if interrupted, the skill detects existing state and offers to continue from where it left off.
+
+## Learn More
+
+For more details, visit [the getting started guide](https://www.wisebuilder.dev/projects/tutorials/alphaevolve-skill/getting-started).
